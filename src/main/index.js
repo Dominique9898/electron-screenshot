@@ -18,6 +18,12 @@ function createWindow () {
    * Initial window options
    */
   mainWindow = new BrowserWindow({
+    webPreferences: {
+      nodeIntegration: true,
+      nativeWindowOpen: true,
+      webviewTag: true,
+      webSecurity: process.env.NODE_ENV === 'production'
+    },
     height: 563,
     useContentSize: true,
     width: 1000
