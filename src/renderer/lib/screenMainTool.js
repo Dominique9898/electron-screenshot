@@ -1,4 +1,4 @@
-import {BrowserWindow, globalShortcut} from "electron";
+import {BrowserWindow, globalShortcut, ipcMain} from "electron";
 
 let captureWins = []
 const os = require('os')
@@ -40,9 +40,8 @@ export default {
       captureWin.setAlwaysOnTop(true, 'screen-saver')
       captureWin.setVisibleOnAllWorkspaces(true)
       captureWin.setFullScreenable(false)
-
+      captureWin.hide()
       captureWin.loadURL(captureURL)
-      captureWin.show()
       let { x, y } = screen.getCursorScreenPoint()
       if (x >= display.bounds.x && x <= display.bounds.x + display.bounds.width && y >= display.bounds.y && y <= display.bounds.y + display.bounds.height) {
         captureWin.focus()
@@ -58,14 +57,24 @@ export default {
           captureWins.splice(index, 1)
         }
         captureWins.forEach(win => win.close())
+        globalShortcut.unregister('Esc', () => {
+          if (captureWins) {
+            captureWins.forEach(win => win.hide())
+          }
+        })
+      })
+      captureWin.on('show', () => {
+        globalShortcut.register('Esc', () => {
+          if (captureWins) {
+            captureWins.forEach(win => win.hide())
+          }
+        })
       })
       return captureWin
     })
-    globalShortcut.register('Esc', () => {
-      if (captureWins) {
-        captureWins.forEach(win => win.hide())
-        captureWins = []
-      }
+    ipcMain.on('SCREENSHOT::START', () => {
+      console.log('IpcMain...... SCREENSHOT::START')
+      captureWins.forEach(win => win.show())
     })
   }
 }
