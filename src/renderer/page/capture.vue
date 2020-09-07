@@ -5,8 +5,14 @@
 </template>
 
 <script>
+const { ipcRenderer } = require('electron')
 export default {
-  name: "capture"
+  name: "capture",
+  created() {
+    ipcRenderer.on('SCREENSHOT::OPEN', (e, data) => {
+      console.log('capture created', data)
+    })
+  },
 }
 </script>
 

@@ -49,7 +49,7 @@ export default {
         captureWin.blur()
       }
       // 调试用
-      // captureWin.openDevTools()
+      // captureWin.webContents.closeDevTools() // 打开dev模式会白底不会透明
 
       captureWin.on('closed', () => {
         let index = captureWins.indexOf(captureWin)
@@ -74,7 +74,10 @@ export default {
     })
     ipcMain.on('SCREENSHOT::START', () => {
       console.log('IpcMain...... SCREENSHOT::START')
-      captureWins.forEach(win => win.show())
+      captureWins.forEach(win => {
+        win.webContents.send('SCREENSHOT::OPEN', 11)
+        win.show()
+      })
     })
   }
 }
