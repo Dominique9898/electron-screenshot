@@ -6,7 +6,10 @@
 
 <script>
   export default {
-    name: 'screenshot'
+    created() {
+      const url = location.href
+      console.log('created', url)
+    },
   }
 </script>
 
