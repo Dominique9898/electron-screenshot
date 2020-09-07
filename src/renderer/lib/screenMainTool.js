@@ -17,29 +17,28 @@ export default {
     let displays = screen.getAllDisplays()
     captureWins = displays.map((display) => {
       let captureWin = new BrowserWindow({
-        // window 使用 fullscreen,  mac 设置为 undefined, 不可为 false
-        fullscreen: os.platform() === 'win32' || undefined,
         width: display.bounds.width,
         height: display.bounds.height,
         x: display.bounds.x,
         y: display.bounds.y,
-        transparent: true,
-        frame: false,
-        // skipTaskbar: true,
-        // autoHideMenuBar: true,
-        movable: false,
-        resizable: false,
-        enableLargerThanScreen: true,
-        hasShadow: false,
         webPreferences: {
           nodeIntegration: true,
           webviewTag: true,
           webSecurity: process.env.NODE_ENV === 'production'
-        }
+        },
+        fullscreen: os.platform() === 'win32' || undefined,
+        resizable: false,
+        enableLargerThanScreen: true,
+        skipTaskbar: true,
+        frame: false,
+        transparent: true,
+        show: false,
+        focusable: true,
+        alwaysOnTop: true
       })
       captureWin.setAlwaysOnTop(true, 'screen-saver')
       captureWin.setVisibleOnAllWorkspaces(true)
-      captureWin.setFullScreenable(false)
+      captureWin.setFullScreenable(true)
       captureWin.hide()
       captureWin.loadURL(captureURL)
       let { x, y } = screen.getCursorScreenPoint()
@@ -75,7 +74,7 @@ export default {
     ipcMain.on('SCREENSHOT::START', () => {
       console.log('IpcMain...... SCREENSHOT::START')
       captureWins.forEach(win => {
-        win.webContents.send('SCREENSHOT::OPEN', 11)
+        win.webContents.send('SCREENSHOT::OPEN')
         win.show()
       })
     })
