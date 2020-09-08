@@ -45,8 +45,10 @@ export default {
     startCaptureCurrentWin(selectSource, imgSrc) {
       // 从主进程传来的thumbnail会丢失
       this.currWin.bgPath = imgSrc
+      const win = remote.getCurrentWindow()
+      win.show()
     }
-  },
+  }
 }
 </script>
 

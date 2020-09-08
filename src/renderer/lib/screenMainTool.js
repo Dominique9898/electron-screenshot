@@ -52,7 +52,7 @@ export default {
         captureWin.blur()
       }
       // 调试用
-      // captureWin.webContents.closeDevTools() // 打开dev模式会白底不会透明
+      captureWin.webContents.closeDevTools() // 打开dev模式会白底不会透明
 
       captureWin.on('closed', () => {
         let index = captureWins.indexOf(captureWin)
@@ -105,7 +105,7 @@ export default {
           { width: win.getBounds().width, height: win.getBounds().height },
           true
         )
-        win.show()
+        // win.show()
       })
     })
   }
