@@ -1,7 +1,8 @@
 <template>
-    <div>
+    <div id="capture" ref="capture">
         <div id="mask" class="mask"></div>
-        <div id="capture-desktop" class="bg" :style="{backgroundImage: 'url(' + this.currWin.bgPath + ')' }"></div>
+<!--        <div id="capture-desktop" class="bg" :style="{backgroundImage: 'url(' + this.currWin.bgPath + ')' }"></div>-->
+        <canvas id="capture-desktop" class="bg"></canvas>
     </div>
 </template>
 
@@ -12,25 +13,38 @@ export default {
   data() {
     return {
       currWin: {
-        h: 0,
-        w: 0,
+        width: 0,
+        height: 0,
         scaleFactor: 0,
         bgPath: '',
         id: 0
       }
     }
   },
+  computed: {
+    win() {
+      return remote.getCurrentWindow()
+    },
+    canvas() {
+      return document.getElementById('capture-desktop')
+    }
+  },
   created() {
     // 初始化当前窗口的信息
     const currWin = this.getCurrentWindow()
-    console.log('currWin', currWin)
     this.currWin.width = currWin.bounds.width
     this.currWin.height = currWin.bounds.height
     this.currWin.id = currWin.id
     this.currWin.scaleFactor = currWin.scaleFactor
-    // this.currWin.scaleFactor = window.devicePixelRatio || 1
     ipcRenderer.on('SCREENSHOT::OPEN', (e, selectSource, imgSrc) => {
       this.startCaptureCurrentWin(selectSource, imgSrc)
+    })
+  },
+  mounted() {
+    this.canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) {
+        console.log('start capturing')
+      }
     })
   },
   methods: {
@@ -39,12 +53,22 @@ export default {
       const wins = remote.screen.getAllDisplays()
       return wins.filter((d) => d.bounds.x === win.getBounds().x && d.bounds.y === win.getBounds().y)[0]
     },
-    handleStream(stream) {
-      console.log(stream)
-    },
     startCaptureCurrentWin(selectSource, imgSrc) {
       // 从主进程传来的thumbnail会丢失
-      this.currWin.bgPath = imgSrc
+      const ctx = this.canvas.getContext('2d')
+      this.canvas.width = this.currWin.width * this.currWin.scaleFactor
+      this.canvas.height = this.currWin.height * this.currWin.scaleFactor
+      ctx.scale(this.currWin.scaleFactor, this.currWin.scaleFactor)
+      this.canvas.style.width = this.currWin.width + 'px'
+      this.canvas.style.height = this.currWin.height + 'px'
+      let img = new Image()
+      img.onload = () => {
+        ctx.clearRect(0,0,this.canvas.width,this.canvas.height)
+        ctx.drawImage(img, 0, 0)
+        img.onload = null
+        img = null
+      }
+      img.src = imgSrc;
       const win = remote.getCurrentWindow()
       win.show()
     }
@@ -75,9 +99,9 @@ export default {
         width: 100%;
         height: 100%;
     }
-    .image-canvas {
-        position: absolute;
-        display: none;
-        z-index: 1;
-    }
+    /*.image-canvas {*/
+    /*    position: absolute;*/
+    /*    display: none;*/
+    /*    z-index: 1;*/
+    /*}*/
 </style>

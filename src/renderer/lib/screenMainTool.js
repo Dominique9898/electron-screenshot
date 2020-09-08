@@ -52,7 +52,7 @@ export default {
         captureWin.blur()
       }
       // 调试用
-      captureWin.webContents.closeDevTools() // 打开dev模式会白底不会透明
+      // captureWin.webContents.closeDevTools() // 打开dev模式会白底不会透明
 
       captureWin.on('closed', () => {
         let index = captureWins.indexOf(captureWin)
@@ -91,8 +91,8 @@ export default {
           'finished',
           (event, sources, fetchWindowIcons) => {
             const wins = screen.getAllDisplays()
-            const _win = wins.filter((d) => d.bounds.x === win.getBounds().x && d.bounds.y === win.getBounds().y)[0]
-            const selectSource = sources.filter(source => source.display_id + '' === _win.id + '')[0]
+            const _win = wins.filter((d) => d.bounds.x === win.getBounds().x && d.bounds.y === win.getBounds().y)[0] // 获取当前的屏幕信息
+            const selectSource = sources.filter(source => source.display_id + '' === _win.id + '')[0] // 根据_win找到在sources对应的截图
             console.log('selectSource', selectSource)
             win.webContents.send('SCREENSHOT::OPEN', selectSource, selectSource.thumbnail.toDataURL())
             stopRunning()
@@ -105,7 +105,6 @@ export default {
           { width: win.getBounds().width, height: win.getBounds().height },
           true
         )
-        // win.show()
       })
     })
   }
