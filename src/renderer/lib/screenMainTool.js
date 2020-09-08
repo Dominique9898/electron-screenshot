@@ -1,4 +1,5 @@
-import {BrowserWindow, globalShortcut, ipcMain} from "electron";
+import { BrowserWindow, globalShortcut, ipcMain, remote } from "electron";
+var EventEmitter = require('events').EventEmitter;
 
 let captureWins = []
 const os = require('os')
@@ -6,8 +7,11 @@ const winURL = process.env.NODE_ENV === 'development'
   ? `http://localhost:9080`
   : `file://${__dirname}/index.html`
 const captureURL = winURL + '#capture'
-
 export default {
+  getCurrentWindow() {
+    const wins = remote.screen.getAllDisplays()
+    return wins.filter((d) => d.bounds.x === win.getBounds().x && d.bounds.y === win.getBounds().y)[0]
+  },
   captureWin() {
     if (captureWins.length) {
       return
@@ -73,8 +77,34 @@ export default {
     })
     ipcMain.on('SCREENSHOT::START', () => {
       console.log('IpcMain...... SCREENSHOT::START')
+      // 主进程调用 desktopCapture, process._linkedBinding这里面内置了很多的内部对象
       captureWins.forEach(win => {
-        win.webContents.send('SCREENSHOT::OPEN')
+        let desktopCapture = require('process').electronBinding('desktop_capturer').createDesktopCapturer()
+        const stopRunning = () => {
+          if (desktopCapture) {
+            desktopCapture.emit = null
+            desktopCapture = null
+          }
+        }
+        const emitter = new EventEmitter()
+        emitter.once(
+          'finished',
+          (event, sources, fetchWindowIcons) => {
+            const wins = screen.getAllDisplays()
+            const _win = wins.filter((d) => d.bounds.x === win.getBounds().x && d.bounds.y === win.getBounds().y)[0]
+            const selectSource = sources.filter(source => source.display_id + '' === _win.id + '')[0]
+            console.log('selectSource', selectSource)
+            win.webContents.send('SCREENSHOT::OPEN', selectSource, selectSource.thumbnail.toDataURL())
+            stopRunning()
+          }
+        )
+        desktopCapture.emit = emitter.emit.bind(emitter)
+        desktopCapture.startHandling(
+          false,
+          true,
+          { width: win.getBounds().width, height: win.getBounds().height },
+          true
+        )
         win.show()
       })
     })
