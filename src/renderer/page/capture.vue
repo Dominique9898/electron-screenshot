@@ -1,13 +1,13 @@
 <template>
     <div id="capture" ref="capture">
         <div id="mask" class="mask"></div>
-<!--        <div id="capture-desktop" class="bg" :style="{backgroundImage: 'url(' + this.currWin.bgPath + ')' }"></div>-->
-        <canvas id="capture-desktop" class="bg"></canvas>
+        <div id="capture-desktop" class="bg" :style="{ backgroundImage: 'url(' + this.currWin.bgPath + ')' }"></div>
+        <canvas id="capture-desktop-canvas" class="bg"></canvas>
     </div>
 </template>
 
 <script>
-const { ipcRenderer, remote, desktopCapturer } = require('electron')
+const { ipcRenderer, remote, globalShortcut } = require('electron')
 export default {
   name: "capture",
   data() {
@@ -26,7 +26,10 @@ export default {
       return remote.getCurrentWindow()
     },
     canvas() {
-      return document.getElementById('capture-desktop')
+      return document.getElementById('capture-desktop-canvas')
+    },
+    ctx() {
+      return document.getElementById('capture-desktop-canvas').getContext('2d')
     }
   },
   created() {
@@ -37,10 +40,18 @@ export default {
     this.currWin.id = currWin.id
     this.currWin.scaleFactor = currWin.scaleFactor
     ipcRenderer.on('SCREENSHOT::OPEN', (e, selectSource, imgSrc) => {
+      this.win.show()
+      this.currWin.bgPath = imgSrc
       this.startCaptureCurrentWin(selectSource, imgSrc)
     })
   },
   mounted() {
+    this.win.on('show', () => {
+      globalShortcut.register('Esc', () => {
+        this.currWin.bgPath = ''
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+      })
+    })
     this.canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) {
         console.log('start capturing')
@@ -63,21 +74,21 @@ export default {
       this.canvas.style.height = this.currWin.height + 'px'
       let img = new Image()
       img.onload = () => {
-        ctx.clearRect(0,0,this.canvas.width,this.canvas.height)
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
         ctx.drawImage(img, 0, 0)
         img.onload = null
         img = null
       }
-      img.src = imgSrc;
-      const win = remote.getCurrentWindow()
-      win.show()
+      img.src = imgSrc
     }
   }
 }
 </script>
 
 <style scoped>
-    html, body, div {
+    html,
+    body,
+    div {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
@@ -99,9 +110,4 @@ export default {
         width: 100%;
         height: 100%;
     }
-    /*.image-canvas {*/
-    /*    position: absolute;*/
-    /*    display: none;*/
-    /*    z-index: 1;*/
-    /*}*/
 </style>
