@@ -356,7 +356,10 @@ export default {
           this.assCanvas.width * this.currWin.scaleFactor,
           this.assCanvas.height * this.currWin.scaleFactor)
       }
-      this.historyRecord.push(currentData)
+      this.historyRecord.push({
+        type: this.curShape.type,
+        data: currentData
+      })
     },
     drawSelect(rect) {
       this.ctx.strokeStyle = '#67bade'
@@ -701,35 +704,40 @@ export default {
       ipcRenderer.send('SCREENSHOT::CLOSE')
     },
     onUndoItemClick() {
-      if (this.shapes.canUndo()) {
-        const topShape = this.shapes.undo()
-        if (topShape.type === 'mosaic') {
-          this.mosaicStack.pop()
-          const imageData = this.mosaicStack[this.mosaicStack.length - 1]
-          this.ctx.putImageData(imageData, 0, 0)
-        } else if (topShape.type === 'curve') {
-          this.curveStack.pop()
-          const imageData = this.curveStack[this.curveStack.length - 1]
-          this.curveCtx.putImageData(imageData, 0, 0)
+      if (this.historyRecord.length > 1) {
+        const lastRecord = this.historyRecord[this.historyRecord.length - 1] // 待撤销的data
+        if (lastRecord.type === 'mosaic') {
+          this.ctx.putImageData(this.historyRecord[this.historyRecord.length - 1].data, 0, 0)
         } else {
-          this.assCtx.clearRect(
-            0,
-            0,
-            this.assCanvas.offsetWidth * this.currWin.scaleFactor,
-            this.assCanvas.offsetHeight * this.currWin.scaleFactor
-          )
-          this.shapes.draw(this.assCtx)
+          this.assCtx.putImageData(this.historyRecord[this.historyRecord.length - 1].data, 0, 0)
         }
-        if (!this.shapes.canUndo()) {
-          this.canUndo = false
-          this.resetIconSelected()
-          this.curShape = {}
-          this.mosaicPicBase64 = ''
-          this.ctx.globalCompositeOperation = 'source-over' // 不设置会清空马赛克后拖动无法画图
-          this.isMosaicMode = false
-          this.selectRect.movable = true
-          this.customBar.showCustomBar = false
+        this.historyRecord.pop()
+      } else if (this.historyRecord.length === 1) {
+        // 最后一个记录最开始的状态
+        const lastRecord = this.historyRecord[0]
+        if (lastRecord.type === 'mosaic') {
+          this.ctx.putImageData(lastRecord.data, 0, 0)
+        } else {
+          this.assCtx.clearRect(0, 0, this.assCanvas.width, this.assCanvas.height)
         }
+        this.historyRecord.pop()
+        this.curShape = {}
+        this.mosaicPicBase64 = ''
+        this.ctx.globalCompositeOperation = 'source-over' // 不设置会清空马赛克后拖动无法画图
+        this.isMosaicMode = false
+        this.selectRect.movable = true
+        this.customBar.showCustomBar = false
+        this.canUndo = false
+        this.resetIconSelected()
+      } else {
+        this.curShape = {}
+        this.mosaicPicBase64 = ''
+        this.ctx.globalCompositeOperation = 'source-over' // 不设置会清空马赛克后拖动无法画图
+        this.isMosaicMode = false
+        this.selectRect.movable = true
+        this.customBar.showCustomBar = false
+        this.canUndo = false
+        this.resetIconSelected()
       }
     },
     onSaveItemClick() {

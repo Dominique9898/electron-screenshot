@@ -49,8 +49,7 @@ export class Rectangle extends Shape {
       this.asscanvas.offsetWidth * this.scaleFactor,
       this.asscanvas.offsetHeight * this.scaleFactor
     )
-    console.log(historyRecord)
-    ctx.putImageData(historyRecord[historyRecord.length - 1], 0, 0)
+    ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
     ctx.beginPath()
     ctx.rect(this.startX * this.scaleFactor, this.startY * this.scaleFactor, (this.endX - this.startX) * this.scaleFactor, (this.endY - this.startY) * this.scaleFactor)
     ctx.stroke()
@@ -76,7 +75,7 @@ export class Ellipse extends Shape {
       this.asscanvas.offsetWidth * this.scaleFactor,
       this.asscanvas.offsetHeight * this.scaleFactor
     )
-    this.ctx.putImageData(historyRecord[historyRecord.length - 1], 0, 0)
+    this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
     this.drawEllipse(
       this.ctx,
       this.startX * this.scaleFactor,
@@ -246,7 +245,7 @@ export class Arrow extends Shape {
   draw(historyRecord) {
     const ctx = this.ctx
     ctx.clearRect(0, 0, this.asscanvas.offsetWidth, this.asscanvas.offsetHeight)
-    this.ctx.putImageData(historyRecord[historyRecord.length - 1], 0, 0)
+    this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
     var beginPoint = {}
     var stopPoint = {}
     beginPoint.x = this.startX * this.scaleFactor
@@ -316,20 +315,11 @@ export class Curve extends Shape {
 export class Shapes extends Shape {
   constructor() {
     super()
-    this.shapes = new Array()
+    this.shapes = []
   }
 
-  push(shape) {
-    this.shapes[this.shapes.length] = shape
-  }
-
-  draw(ctx) {
-    super.draw(ctx)
-    this.shapes.forEach(function (shape) {
-      if (shape.type !== 'mosaic') {
-        shape.draw(ctx)
-      }
-    })
+  push(currentImageData) {
+    this.shapes.push(currentImageData)
   }
 
   undo() {
