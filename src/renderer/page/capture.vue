@@ -21,17 +21,6 @@
           'px'
       }"
         ></canvas>
-
-        <canvas
-                id="curve-canvas"
-                v-if="!this.selectRect.disable"
-                :style="{
-        position: 'absolute',
-        width: this.selectRect.width + 'px',
-        height: this.selectRect.height + 'px',
-        zIndex: 3
-      }"
-        ></canvas>
         <canvas
                 id="assistant-canvas"
                 v-if="!this.selectRect.disable"
@@ -263,8 +252,7 @@ export default {
       },
       mosaicPicBase64: '',
       isMosaicMode: false,
-      mosaicStack: [],
-      curveStack: []
+      historyRecord: [], // 保存涂鸦的记录
     }
   },
   computed: {
@@ -282,13 +270,7 @@ export default {
     },
     assCtx() {
       return document.getElementById('assistant-canvas').getContext('2d')
-    },
-    curveCanvas() {
-      return document.getElementById('curve-canvas')
-    },
-    curveCtx() {
-      return document.getElementById('curve-canvas').getContext('2d')
-    },
+    }
   },
   mounted() {
     this.initListern()
@@ -363,16 +345,18 @@ export default {
       })
     },
     recordAndClearEvents() {
+      // mosaic capture-desktop-canvas, // 其他画在assist-canvas
       let currentData
       if (this.curShape.type === 'mosaic') {
         currentData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height)
-        this.mosaicStack.push(currentData)
-      } else if (this.curShape.type === 'curve') {
-        currentData = this.curveCtx.getImageData(0, 0, this.canvas.width, this.canvas.height)
-        this.curveStack.push(currentData)
       } else {
-        currentData = this.assCtx.getImageData(0, 0, this.selectRect.width, this.selectRect.width)
+        currentData = this.assCtx.getImageData(
+          0,
+          0,
+          this.assCanvas.width * this.currWin.scaleFactor,
+          this.assCanvas.height * this.currWin.scaleFactor)
       }
+      this.historyRecord.push(currentData)
     },
     drawSelect(rect) {
       this.ctx.strokeStyle = '#67bade'
@@ -416,6 +400,7 @@ export default {
           this.mouseStatus.down = true
           this.mouseStatus.up = false
           this.curShape.start(e.offsetX, e.offsetY)
+          this.recordAndClearEvents()
         } else if (this.selectRect.movable) {
           this.mouseStatus.down = true
           this.mouseStatus.up = false
@@ -435,16 +420,9 @@ export default {
           }
           callback(rect)
         } else if (!this.isEmptyObject(this.curShape) && this.curShape.isDrawing) {
-          this.assCtx.clearRect(
-            0,
-            0,
-            this.assCanvas.offsetWidth * this.currWin.scaleFactor,
-            this.assCanvas.offsetHeight * this.currWin.scaleFactor
-          )
           this.curShape.endX = e.clientX - this.selectRect.x
           this.curShape.endY = e.clientY - this.selectRect.y
-          this.shapes.draw(this.assCtx)
-          this.curShape.draw(this.assCtx)
+          this.curShape.draw(this.historyRecord)
         } else if (this.selectRect.movable) {
           this.toolbar.showToolbar = false
           console.log('move', e)
@@ -470,8 +448,6 @@ export default {
           this.$nextTick(() => {
             this.assCanvas.style.left = rect.sx + 'px'
             this.assCanvas.style.top = rect.sy + 'px'
-            this.curveCanvas.style.left = rect.sx + 'px'
-            this.curveCanvas.style.top = rect.sy + 'px'
           })
         }
       }
@@ -490,16 +466,12 @@ export default {
           document.removeEventListener('mousedown', this.onMouseDown)
           const that = this
           this.$nextTick(() => {
-            if (that.assCanvas || that.curveCanvas) {
+            if (that.assCanvas) {
               that.assCanvas.addEventListener('mousedown', this.onMouseDown)
               that.assCanvas.width = this.selectRect.width * this.currWin.scaleFactor
               that.assCanvas.height = this.selectRect.height * this.currWin.scaleFactor
               that.assCanvas.style.left = this.selectRect.x + 'px'
               that.assCanvas.style.top = this.selectRect.y + 'px'
-              that.curveCanvas.width = this.selectRect.width * this.currWin.scaleFactor
-              that.curveCanvas.height = this.selectRect.height * this.currWin.scaleFactor
-              that.curveCanvas.style.left = this.selectRect.x + 'px'
-              that.curveCanvas.style.top = this.selectRect.y + 'px'
             }
           })
         } else if (!this.isEmptyObject(this.curShape) && this.curShape.isDrawing) {
@@ -508,9 +480,6 @@ export default {
           this.curShape.endY = e.clientY - this.selectRect.y
           this.mouseStatus.down = false
           this.mouseStatus.up = true
-          if (this.curShape.type === 'mosaic' || this.curShape.type === 'curve') {
-            this.recordAndClearEvents()
-          }
           const shapeCopy = this.clone(this.curShape)
           this.shapes.push(shapeCopy)
           this.curShape.reset()
@@ -632,7 +601,7 @@ export default {
       this.setStrokeStyle(color)
     },
     rectangle() {
-      this.curShape = new Rectangle(this.currWin.scaleFactor)
+      this.curShape = new Rectangle(this.assCanvas, this.currWin.scaleFactor)
       this.selectRect.movable = false
       this.resetIconSelected()
       this.iconSelected.rect = true
@@ -642,7 +611,7 @@ export default {
       this.showCaptureCustomBar()
     },
     ellipse() {
-      this.curShape = new Ellipse(this.currWin.scaleFactor)
+      this.curShape = new Ellipse(this.assCanvas, this.currWin.scaleFactor)
       this.selectRect.movable = false
       this.resetIconSelected()
       this.iconSelected.ellipse = true
@@ -653,7 +622,7 @@ export default {
     },
     arrow() {
       this.selectRect.movable = false
-      this.curShape = new Arrow(this.currWin.scaleFactor)
+      this.curShape = new Arrow(this.assCanvas, this.currWin.scaleFactor)
       this.resetIconSelected()
       this.iconSelected.arrow = true
       this.setCustomBarRetangeMargin(100)
@@ -663,9 +632,8 @@ export default {
     },
     curve() {
       this.selectRect.movable = false
-      this.curShape = new Curve(this.curveCtx, this.selectRect, this.currWin.scaleFactor)
+      this.curShape = new Curve(this.assCanvas, this.selectRect, this.currWin.scaleFactor)
       this.resetIconSelected()
-      this.recordAndClearEvents()
       this.iconSelected.curve = true
       this.setCustomBarRetangeMargin(140)
       this.customBar.showCustomBar = true
@@ -701,8 +669,6 @@ export default {
       const assctx = asscanvas.getContext('2d')
       asscanvas.width = (this.selectRect.width - 2 * this.currWin.scaleFactor) * this.currWin.scaleFactor
       asscanvas.height = (this.selectRect.height - 2 * this.currWin.scaleFactor) * this.currWin.scaleFactor
-      // 获取原始canvas画布的图片资源, 撤销使用
-      this.recordAndClearEvents()
       // 获取选框内的图片资源, 画马赛克原图使用
       const originImageData = this.ctx.getImageData(
         (this.selectRect.x + this.currWin.scaleFactor) * this.currWin.scaleFactor,

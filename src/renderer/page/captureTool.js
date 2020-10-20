@@ -7,11 +7,6 @@ class Shape {
     this.strokeStyle = 'red'
   }
 
-  draw(ctx) {
-    ctx.strokeStyle = this.strokeStyle
-    ctx.lineWidth = this.lineWidth
-  }
-
   reset() {
     this.startX = 0
     this.startY = 0
@@ -36,16 +31,26 @@ class Shape {
 }
 
 export class Rectangle extends Shape {
-  constructor(scaleFactor) {
+  constructor(asscanvas, scaleFactor) {
     super()
     this.type = 'rectangle'
     this.scaleFactor = scaleFactor
+    this.ctx = asscanvas.getContext('2d')
+    this.asscanvas = asscanvas
   }
 
-  draw(ctx) {
-    super.draw(ctx)
-    // ctx.clearRect(0, 0, this.asscanvas.offsetWidth, this.asscanvas.offsetHeight)
-    ctx.lineWidth = ctx.lineWidth * this.scaleFactor
+  draw(historyRecord) {
+    const ctx = this.ctx
+    ctx.lineWidth = this.lineWidth * this.scaleFactor
+    ctx.strokeStyle = this.strokeStyle
+    ctx.clearRect(
+      0,
+      0,
+      this.asscanvas.offsetWidth * this.scaleFactor,
+      this.asscanvas.offsetHeight * this.scaleFactor
+    )
+    console.log(historyRecord)
+    ctx.putImageData(historyRecord[historyRecord.length - 1], 0, 0)
     ctx.beginPath()
     ctx.rect(this.startX * this.scaleFactor, this.startY * this.scaleFactor, (this.endX - this.startX) * this.scaleFactor, (this.endY - this.startY) * this.scaleFactor)
     ctx.stroke()
@@ -53,22 +58,35 @@ export class Rectangle extends Shape {
 }
 
 export class Ellipse extends Shape {
-  constructor(scaleFactor) {
+  constructor(asscanvas, scaleFactor) {
     super();
     this.type = 'ellipse'
     this.scaleFactor = scaleFactor
+    this.asscanvas = asscanvas
+    this.ctx = asscanvas.getContext('2d')
   }
-  draw(ctx) {
-    super.draw(ctx)
-
+  draw(historyRecord) {
     var x = (this.startX + this.endX) / 2
     var y = (this.startY + this.endY) / 2
     var w = this.endX - this.startX
     var h = this.endY - this.startY
-    this.drawEllipse(ctx, this.startX * this.scaleFactor, this.startY * this.scaleFactor, w * this.scaleFactor, h * this.scaleFactor)
+    this.ctx.clearRect(
+      0,
+      0,
+      this.asscanvas.offsetWidth * this.scaleFactor,
+      this.asscanvas.offsetHeight * this.scaleFactor
+    )
+    this.ctx.putImageData(historyRecord[historyRecord.length - 1], 0, 0)
+    this.drawEllipse(
+      this.ctx,
+      this.startX * this.scaleFactor,
+      this.startY * this.scaleFactor,
+      w * this.scaleFactor,
+      h * this.scaleFactor)
   }
-
   drawEllipse(ctx, x, y, w, h) {
+    ctx.lineWidth = this.lineWidth * this.scaleFactor
+    ctx.strokeStyle = this.strokeStyle
     var kappa = 0.5522848
     var ox = (w / 2) * kappa // control point offset horizontal
     var oy = (h / 2) * kappa // control point offset vertical
@@ -76,8 +94,6 @@ export class Ellipse extends Shape {
     var ye = y + h // y-end
     var xm = x + w / 2 // x-middle
     var ym = y + h / 2 // y-middle
-
-    ctx.lineWidth = ctx.lineWidth * this.scaleFactor
 
     ctx.beginPath()
     ctx.moveTo(x, ym)
@@ -98,10 +114,8 @@ export class Mosaic extends Shape{
     this.selectRect = selectRect
     this.mosaicBlockWidth = this.lineWidth
   }
-  draw(ctx) {
-    // super.draw(ctx)
+  draw() {
     // 圆心 (this.endX, this.endY), 半径 R = this.mosaicBlockWidth
-    console.log('this.mosaicBlockWidth', this.mosaicBlockWidth)
     if (this.lineWidth === 7) {
       this.mosaicBlockWidth = 15
     } else if (this.lineWidth === 5) {
@@ -131,9 +145,11 @@ export class Text extends Shape{
 
 }
 export class Arrow extends Shape {
-  constructor(scaleFactor) {
+  constructor(asscanvas, scaleFactor) {
     super()
     this.scaleFactor = scaleFactor
+    this.ctx = asscanvas.getContext('2d')
+    this.asscanvas = asscanvas
     this.type = 'arrow'
     var polygonVertex = []
     const that = this
@@ -227,9 +243,10 @@ export class Arrow extends Shape {
     }
   }
 
-  draw(ctx) {
-    super.draw(ctx)
-    // ctx.clearRect(0, 0, this.asscanvas.offsetWidth, this.asscanvas.offsetHeight)
+  draw(historyRecord) {
+    const ctx = this.ctx
+    ctx.clearRect(0, 0, this.asscanvas.offsetWidth, this.asscanvas.offsetHeight)
+    this.ctx.putImageData(historyRecord[historyRecord.length - 1], 0, 0)
     var beginPoint = {}
     var stopPoint = {}
     beginPoint.x = this.startX * this.scaleFactor
@@ -250,21 +267,20 @@ export class Arrow extends Shape {
   }
 }
 export class Curve extends Shape {
-  constructor(mainctx, selectRect, scaleFactor) {
+  constructor(asscanvas, selectRect, scaleFactor) {
     super();
     this.type = 'curve'
-    this.mainctx = mainctx
+    this.ctx = asscanvas.getContext('2d')
+    this.asscanvas = asscanvas
     this.selectRect = selectRect
     this.scaleFactor = scaleFactor
-    this.down = false
   }
-  draw(ctx) {
-    super.draw(ctx)
-    this.mainctx.lineCap = 'round'
-    this.mainctx.lineJoin = 'round'
-    this.mainctx.fillStyle = this.strokeStyle
+  draw() {
+    const ctx = this.ctx
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.fillStyle = this.strokeStyle
     let [x2,y2,x1, y1] = [this.endX, this.endY, this.startX, this.startY]
-    console.log(this.endX, this.endY, this.mainctx)
     const lineWidth = Math.ceil(this.lineWidth / 3)
     const asin = lineWidth * Math.sin(Math.atan((y2 - y1) / (x2 - x1)));
     const acos = lineWidth * Math.cos(Math.atan((y2 - y1) / (x2 - x1)));
@@ -278,17 +294,17 @@ export class Curve extends Shape {
     const x6 = x2 - asin;
     const y6 = y2 + acos;
 
-    this.mainctx.beginPath();
-    this.mainctx.arc(x2 * this.scaleFactor, y2 * this.scaleFactor, lineWidth * this.scaleFactor, 0, 2 * Math.PI);
-    this.mainctx.fill();
-    this.mainctx.closePath();
-    this.mainctx.beginPath();
-    this.mainctx.moveTo(x3 * this.scaleFactor, y3 * this.scaleFactor);
-    this.mainctx.lineTo(x5 * this.scaleFactor, y5 * this.scaleFactor);
-    this.mainctx.lineTo(x6 * this.scaleFactor, y6 * this.scaleFactor);
-    this.mainctx.lineTo(x4 * this.scaleFactor, y4 * this.scaleFactor);
-    this.mainctx.fill();
-    this.mainctx.closePath();
+    ctx.beginPath();
+    ctx.arc(x2 * this.scaleFactor, y2 * this.scaleFactor, lineWidth * this.scaleFactor, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.closePath();
+    ctx.beginPath();
+    ctx.moveTo(x3 * this.scaleFactor, y3 * this.scaleFactor);
+    ctx.lineTo(x5 * this.scaleFactor, y5 * this.scaleFactor);
+    ctx.lineTo(x6 * this.scaleFactor, y6 * this.scaleFactor);
+    ctx.lineTo(x4 * this.scaleFactor, y4 * this.scaleFactor);
+    ctx.fill();
+    ctx.closePath();
     this.startX = x2;
     this.startY = y2;
   }

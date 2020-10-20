@@ -94,7 +94,7 @@ export default {
       if (error) throw error
       for (let i = 0; i < captureWins.length - 1; i++) {
         // 调试用
-        const captureWin = captureWins[i]
+        const captureWin = captureWins[i + 1]
         const _win = displays.filter(
           (d) => d.bounds.x === captureWin.getBounds().x && d.bounds.y === captureWin.getBounds().y
         )[0] // 获取当前的屏幕信息
