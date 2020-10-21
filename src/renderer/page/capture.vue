@@ -7,8 +7,8 @@
         ></div>
         <div id="mask" class="mask"></div>
         <canvas
-                id="capture-desktop-canvas"
-                :style="{
+         id="capture-desktop-canvas"
+         :style="{
         backgroundImage: 'url(' + this.mosaicPicBase64 + ')',
         background: 'no-repeat',
         backgroundPosition:
@@ -67,11 +67,11 @@
                         :src="this.iconSelected.mosaic ? this.icon.mosaicSelected : this.icon.mosaic"
                         @click="mosaic"
                 />
-                <!--        <img-->
-                <!--          class="capture_toolbar_item capture_toolbar_item_text"-->
-                <!--          :src="this.iconSelected.text ? this.icon.textSelected : this.icon.text"-->
-                <!--          @click="text"-->
-                <!--        />-->
+                        <img
+                          class="capture_toolbar_item capture_toolbar_item_text"
+                          :src="this.iconSelected.text ? this.icon.textSelected : this.icon.text"
+                          @click="text"
+                        />
             </div>
             <div class="divider_line"></div>
             <div class="toolbar_item_control">
@@ -350,11 +350,7 @@ export default {
       if (this.curShape.type === 'mosaic') {
         currentData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height)
       } else {
-        currentData = this.assCtx.getImageData(
-          0,
-          0,
-          this.assCanvas.width * this.currWin.scaleFactor,
-          this.assCanvas.height * this.currWin.scaleFactor)
+        currentData = this.assCtx.getImageData(0, 0, this.assCanvas.width, this.assCanvas.height)
       }
       this.historyRecord.push({
         type: this.curShape.type,
@@ -403,7 +399,11 @@ export default {
           this.mouseStatus.down = true
           this.mouseStatus.up = false
           this.curShape.start(e.offsetX, e.offsetY)
-          this.recordAndClearEvents()
+          if (this.curShape.type !== 'text') {
+            this.recordAndClearEvents()
+          } else {
+            this.curShape.draw(this.historyRecord)
+          }
         } else if (this.selectRect.movable) {
           this.mouseStatus.down = true
           this.mouseStatus.up = false
@@ -423,9 +423,11 @@ export default {
           }
           callback(rect)
         } else if (!this.isEmptyObject(this.curShape) && this.curShape.isDrawing) {
-          this.curShape.endX = e.clientX - this.selectRect.x
-          this.curShape.endY = e.clientY - this.selectRect.y
-          this.curShape.draw(this.historyRecord)
+          if (this.curShape.type !== 'text') {
+            this.curShape.endX = e.clientX - this.selectRect.x
+            this.curShape.endY = e.clientY - this.selectRect.y
+            this.curShape.draw(this.historyRecord)
+          }
         } else if (this.selectRect.movable) {
           this.toolbar.showToolbar = false
           console.log('move', e)
@@ -522,6 +524,11 @@ export default {
         mosaic: false,
         text: false
       }
+      const textHelper = document.getElementById('textHelper')
+      // textHelper.style.display = 'none'
+      if (textHelper.innerText) {
+        this.curShape.draw(this.historyRecord)
+      }
     },
     isEmptyObject(obj) {
       return JSON.stringify(obj) === '{}'
@@ -536,8 +543,8 @@ export default {
         this.currWin.scaleFactor
       ]
       const margin = this.customBar.showCustomBar ? 50 : 0
-      // const capturetoolbarLen = 438
-      const capturetoolbarLen = 400
+      const capturetoolbarLen = 438
+      // const capturetoolbarLen = 400
       const rightBottomPotin = {
         x: this.selectRect.x + this.selectRect.width,
         y: this.selectRect.y + this.selectRect.height
@@ -659,7 +666,7 @@ export default {
     },
     text() {
       this.selectRect.movable = false
-      this.curShape = new Text()
+      this.curShape = new Text(this.selectRect)
       this.resetIconSelected()
       this.iconSelected.text = true
       this.setCustomBarRetangeMargin(220)
@@ -704,10 +711,19 @@ export default {
       ipcRenderer.send('SCREENSHOT::CLOSE')
     },
     onUndoItemClick() {
+      console.log(this.historyRecord)
       if (this.historyRecord.length > 1) {
         const lastRecord = this.historyRecord[this.historyRecord.length - 1] // 待撤销的data
         if (lastRecord.type === 'mosaic') {
           this.ctx.putImageData(this.historyRecord[this.historyRecord.length - 1].data, 0, 0)
+        }  else if (lastRecord.type === 'text') {
+          const textNodes = document.getElementsByClassName('textNode')
+          const lastNode = textNodes[textNodes.length - 1]
+          document.getElementById('capture').removeChild(lastNode)
+        } else if (lastRecord.type === 'textmove') {
+          const data = lastRecord.data
+          data.node.style.left = data.left + 'px'
+          data.node.style.top = data.top + 'px'
         } else {
           this.assCtx.putImageData(this.historyRecord[this.historyRecord.length - 1].data, 0, 0)
         }
@@ -717,6 +733,14 @@ export default {
         const lastRecord = this.historyRecord[0]
         if (lastRecord.type === 'mosaic') {
           this.ctx.putImageData(lastRecord.data, 0, 0)
+        } else if (lastRecord.type === 'text') {
+          const textNodes = document.getElementsByClassName('textNode')
+          const lastNode = textNodes[textNodes.length - 1]
+          document.getElementById('capture').removeChild(lastNode)
+        } else if (lastRecord.type === 'textmove') {
+          const data = lastRecord.data
+          data.node.style.left = data.left + 'px'
+          data.node.style.top = data.top + 'px'
         } else {
           this.assCtx.clearRect(0, 0, this.assCanvas.width, this.assCanvas.height)
         }

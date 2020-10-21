@@ -137,11 +137,115 @@ export class Mosaic extends Shape{
   }
 }
 export class Text extends Shape{
-  constructor(props) {
-    super(props)
-
+  constructor(selectRect) {
+    super()
+    this.fontSize = 22
+    this.selectRect = selectRect
+    this.type = 'text'
+    this.textHelperStyle = {
+      position: 'absolute',
+      'font-size': this.fontSize + 'px',
+      'line-height': this.fontSize + 'px',
+      'min-width': this.fontSize + 'px',
+      'min-height': this.fontSize + 'px',
+      outline: 'none',
+      left: this.startX + 'px',
+      top: this.startY + 'px',
+      'transform': 'translate(-50%, -50%)',
+      display: 'none',
+      'background-color': 'transparent',
+      padding: '8px',
+      'user-select': 'none',
+      '-webkit-user-select': 'none',
+      'z-index': '4',
+      'font-family': 'Microsoft YaHei,Sans Serif,System UI',
+    }
+    const div = document.createElement('div')
+    div.setAttribute('contenteditable', true)
+    div.setAttribute('id', 'textHelper')
+    const capture = document.getElementById('capture')
+    capture.appendChild(div)
+    div.focus(() => {
+      div.style.color = this.strokeStyle
+    })
   }
-
+  createTextNode(textHelper, historyRecord) {
+    historyRecord.push({
+      type: 'text'
+    })
+    let style = ''
+    const textNode = document.createElement('div')
+    textNode.className = 'textNode'
+    textHelper.style.display = 'none'
+    delete this.textHelperStyle.border
+    this.textHelperStyle.cursor = 'move'
+    for (let key in this.textHelperStyle) {
+      style += `${key}:${this.textHelperStyle[key]};`
+    }
+    textNode.style.cssText = style
+    textNode.innerText = textHelper.innerText
+    textHelper.innerText = ''
+    const capture = document.getElementById('capture')
+    const left = parseInt(this.textHelperStyle.left)
+    const top = parseInt(this.textHelperStyle.top)
+    capture.appendChild(textNode)
+    let [down, up, move] = [false, false, false]
+    textNode.onmousedown = (e) => {
+      down = true
+      up = false
+      textHelper.style.display = 'none'
+      document.onmousemove = (e) => {
+        if (down && !up) {
+          if (textHelper.innerText)this.createTextNode(textHelper)
+          const moveLeft = left + (e.clientX - left)
+          const moveTop = top + (e.clientY - top)
+          if (
+            moveLeft < this.selectRect.x ||
+            moveLeft > this.selectRect.x + this.selectRect.width ||
+            moveTop < this.selectRect.y ||
+            moveTop > this.selectRect.y + this.selectRect.width
+          ) {
+            return
+          }
+          textNode.style.left = moveLeft + 'px'
+          textNode.style.top = moveTop + 'px'
+        }
+      }
+      document.onmouseup = (e) => {
+        down = false
+        up = true
+        historyRecord.push({
+          type:'textmove',
+          data: {
+            node:textNode,
+            left: left,
+            top: top
+          }
+        })
+        document.onmousemove = null
+        document.onmouseup = null
+      }
+    }
+  }
+  draw(historyRecord) {
+    const textHelper = document.getElementById('textHelper')
+    let innerText = textHelper.innerText ? textHelper.innerText : ''
+    this.textHelperStyle.display = 'block'
+    this.textHelperStyle.color = this.strokeStyle
+    let style = ''
+    if (innerText.length === 0) {
+      this.textHelperStyle.left = this.startX + this.selectRect.x + 'px'
+      this.textHelperStyle.top = this.startY + this.selectRect.y + 'px'
+      this.textHelperStyle.cursor = 'text'
+      this.textHelperStyle.border = '1px solid black'
+      for (let key in this.textHelperStyle) {
+        style += `${key}:${this.textHelperStyle[key]};`
+      }
+      textHelper.style.cssText = style
+    } else {
+      this.createTextNode(textHelper, historyRecord)
+    }
+  }
 }
 export class Arrow extends Shape {
   constructor(asscanvas, scaleFactor) {
