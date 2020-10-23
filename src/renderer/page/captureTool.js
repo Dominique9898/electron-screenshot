@@ -49,7 +49,7 @@ export class Rectangle extends Shape {
       this.asscanvas.offsetWidth * this.scaleFactor,
       this.asscanvas.offsetHeight * this.scaleFactor
     )
-    ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    if (historyRecord.length > 1) ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
     ctx.beginPath()
     ctx.rect(this.startX * this.scaleFactor, this.startY * this.scaleFactor, (this.endX - this.startX) * this.scaleFactor, (this.endY - this.startY) * this.scaleFactor)
     ctx.stroke()
@@ -75,7 +75,7 @@ export class Ellipse extends Shape {
       this.asscanvas.offsetWidth * this.scaleFactor,
       this.asscanvas.offsetHeight * this.scaleFactor
     )
-    this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    if (historyRecord.length > 1) this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
     this.drawEllipse(
       this.ctx,
       this.startX * this.scaleFactor,
@@ -148,9 +148,12 @@ export class Text extends Shape{
       'line-height': this.fontSize + 'px',
       'min-width': this.fontSize + 'px',
       'min-height': this.fontSize + 'px',
+      color: 'red',
       outline: 'none',
-      left: this.startX + 'px',
-      top: this.startY + 'px',
+      left: 0,
+      top: 0,
+      cursor: 'text',
+      border: '1px solid black',
       'transform': 'translate(-50%, -50%)',
       display: 'none',
       'background-color': 'transparent',
@@ -160,55 +163,61 @@ export class Text extends Shape{
       'z-index': '4',
       'font-family': 'Microsoft YaHei,Sans Serif,System UI',
     }
-    const div = document.createElement('div')
-    div.setAttribute('contenteditable', true)
-    div.setAttribute('id', 'textHelper')
-    const capture = document.getElementById('capture')
-    capture.appendChild(div)
-    div.focus(() => {
-      div.style.color = this.strokeStyle
-    })
+    let textHelper = document.getElementById('textHelper')
+    let textContainer = document.getElementById('textContainer')
+    if (!textHelper && !textContainer) {
+      textContainer = document.createElement('div')
+      textContainer.setAttribute( 'id', 'textContainer')
+      textContainer.style.cssText = `position: absolute;overflow:hidden;left: ${this.selectRect.x}px; top:${this.selectRect.y}px; width:${this.selectRect.width}px; height:${this.selectRect.height}px`
+
+      let style = ''
+      textHelper = document.createElement('div')
+      for (let key in this.textHelperStyle) {
+        style += `${key}:${this.textHelperStyle[key]};`
+      }
+      textHelper.setAttribute('contenteditable', true)
+      textHelper.setAttribute('id', 'textHelper')
+      textHelper.style.cssText = style
+      const capture = document.getElementById('capture')
+      textContainer.appendChild(textHelper)
+      capture.appendChild(textContainer)
+    } else {
+      textContainer.style.cssText = `position: absolute;overflow:hidden;left: ${this.selectRect.x}px; top:${this.selectRect.y}px; width:${this.selectRect.width}px; height:${this.selectRect.height}px`
+    }
   }
-  createTextNode(textHelper, historyRecord) {
+  createTextNode(historyRecord) {
+    historyRecord.pop() // pop出textHelper
+    const textHelper = document.getElementById('textHelper')
+    let style = ''
+    style = textHelper.style.cssText
+    const textNode = document.createElement('div')
+    textNode.className = 'textNode'
+    textNode.style.cssText = style
+    textNode.style.border = ''
+    textNode.style.cursor = 'move'
+
+    textHelper.style.display = 'none'
+
+    textNode.innerText = textHelper.innerText
+    textHelper.innerText = ''
+
     historyRecord.push({
       type: 'text'
     })
-    let style = ''
-    const textNode = document.createElement('div')
-    textNode.className = 'textNode'
-    textHelper.style.display = 'none'
-    delete this.textHelperStyle.border
-    this.textHelperStyle.cursor = 'move'
-    for (let key in this.textHelperStyle) {
-      style += `${key}:${this.textHelperStyle[key]};`
-    }
-    textNode.style.cssText = style
-    textNode.innerText = textHelper.innerText
-    textHelper.innerText = ''
-    const capture = document.getElementById('capture')
-    const left = parseInt(this.textHelperStyle.left)
-    const top = parseInt(this.textHelperStyle.top)
-    capture.appendChild(textNode)
+
+    const left = parseInt(textNode.style.left)
+    const top = parseInt(textNode.style.top)
+    document.getElementById('textContainer').appendChild(textNode)
     let [down, up, move] = [false, false, false]
     textNode.onmousedown = (e) => {
       down = true
       up = false
+      if (textHelper.innerText.length > 0 ) this.createTextNode(historyRecord)
       textHelper.style.display = 'none'
       document.onmousemove = (e) => {
         if (down && !up) {
-          if (textHelper.innerText)this.createTextNode(textHelper)
-          const moveLeft = left + (e.clientX - left)
-          const moveTop = top + (e.clientY - top)
-          if (
-            moveLeft < this.selectRect.x ||
-            moveLeft > this.selectRect.x + this.selectRect.width ||
-            moveTop < this.selectRect.y ||
-            moveTop > this.selectRect.y + this.selectRect.width
-          ) {
-            return
-          }
-          textNode.style.left = moveLeft + 'px'
-          textNode.style.top = moveTop + 'px'
+          textNode.style.left = left + (e.clientX - this.selectRect.x - left)  + 'px'
+          textNode.style.top = top + (e.clientY - this.selectRect.y - top) + 'px'
         }
       }
       document.onmouseup = (e) => {
@@ -229,21 +238,21 @@ export class Text extends Shape{
   }
   draw(historyRecord) {
     const textHelper = document.getElementById('textHelper')
-    let innerText = textHelper.innerText ? textHelper.innerText : ''
-    this.textHelperStyle.display = 'block'
-    this.textHelperStyle.color = this.strokeStyle
-    let style = ''
+    let innerText = textHelper && textHelper.innerText ? textHelper.innerText : ''
+    console.log('draw text', innerText)
     if (innerText.length === 0) {
-      this.textHelperStyle.left = this.startX + this.selectRect.x + 'px'
-      this.textHelperStyle.top = this.startY + this.selectRect.y + 'px'
-      this.textHelperStyle.cursor = 'text'
-      this.textHelperStyle.border = '1px solid black'
-      for (let key in this.textHelperStyle) {
-        style += `${key}:${this.textHelperStyle[key]};`
+      // x, y 是针对asscanvas 的offsetX, offsetY
+      textHelper.style.left = this.startX + 'px'
+      textHelper.style.top = this.startY + 'px'
+      textHelper.style.display = 'block'
+      if (!historyRecord.length || historyRecord[historyRecord.length - 1].type !== 'textHelper') {
+        // 防止重复点击
+        historyRecord.push({
+          type:'textHelper'
+        })
       }
-      textHelper.style.cssText = style
     } else {
-      this.createTextNode(textHelper, historyRecord)
+      this.createTextNode(historyRecord)
     }
   }
 }
@@ -349,7 +358,7 @@ export class Arrow extends Shape {
   draw(historyRecord) {
     const ctx = this.ctx
     ctx.clearRect(0, 0, this.asscanvas.offsetWidth, this.asscanvas.offsetHeight)
-    this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    if (historyRecord.length > 1) ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
     var beginPoint = {}
     var stopPoint = {}
     beginPoint.x = this.startX * this.scaleFactor

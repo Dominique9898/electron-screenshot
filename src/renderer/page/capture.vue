@@ -114,7 +114,7 @@
             ></div>
 
             <div class="capture_custom_bar">
-                <div class="size_board" v-if="curShape.type !== 'mosaic'">
+                <div class="size_board" v-if="curShape.type !== 'text'">
                     <div class="size_item_min size_item" @click="sizeItemClick($event, 3)"></div>
                     <div
                             class="size_item_middle size_item"
@@ -124,16 +124,13 @@
                     <div class="size_item_large size_item" @click="sizeItemClick($event, 7)"></div>
                     <div class="divider_line"></div>
                 </div>
-                <div class="size_board" v-if="curShape.type === 'mosaic'">
-                    <div class="size_item_min size_item" @click="sizeItemClick($event, 3)"></div>
-                    <div
-                            class="size_item_middle size_item"
-                            :class="{ size_selected_item: this.customBar.isSizeItemDefauleSelected }"
-                            @click="sizeItemClick($event, 5)"
-                    ></div>
-                    <div class="size_item_large size_item" @click="sizeItemClick($event, 7)"></div>
+                <div class="size_board" v-if="curShape.type === 'text'">
+                    <div class="select" @mousedown="setFontSizeOptions(false)" @mouseup="setFontSizeOptions(true)">
+                        <div class="font">{{ this.defaultFontSize }}</div>
+                        <div class="select_triangle"></div>
+                    </div>
+                    <div class="divider_line"></div>
                 </div>
-
                 <div class="color_board" v-if="curShape.type !== 'mosaic'">
                     <div class="color_item_red color_item" style="background: red" @click="colorItemClick($event, 'red')"></div>
                     <div
@@ -161,6 +158,11 @@
                             style="background: white"
                             @click="colorItemClick($event, 'white')"
                     ></div>
+                </div>
+            </div>
+            <div class="select_options" v-if="this.curShape.type === 'text' && this.showFontSizeOptions">
+                <div class="select_size_item" v-for="size of 5" @click="onFontSizeClick(28 - 2 * size)">
+                    {{ 28 - 2 * size }}
                 </div>
             </div>
         </div>
@@ -194,6 +196,10 @@ export default {
         up: false,
         move: false
       },
+      // 文字字体大小选择
+      showFontSizeOptions: false,
+      defaultFontSize: 22,
+      // 涂鸦选择工具条
       customBar: {
         showCustomBar: false,
         customBarLeft: 0,
@@ -201,6 +207,7 @@ export default {
         customBarRetangeMargin: 20,
         isSizeItemDefauleSelected: true
       },
+      // 截图工具条
       toolbar: {
         top: 0,
         left: 0,
@@ -344,7 +351,10 @@ export default {
         )
       })
     },
-    recordAndClearEvents() {
+    setFontSizeOptions(bool) {
+      this.showFontSizeOptions = bool
+    },
+    recordEvents() {
       // mosaic capture-desktop-canvas, // 其他画在assist-canvas
       let currentData
       if (this.curShape.type === 'mosaic') {
@@ -400,7 +410,7 @@ export default {
           this.mouseStatus.up = false
           this.curShape.start(e.offsetX, e.offsetY)
           if (this.curShape.type !== 'text') {
-            this.recordAndClearEvents()
+            this.recordEvents()
           } else {
             this.curShape.draw(this.historyRecord)
           }
@@ -423,11 +433,9 @@ export default {
           }
           callback(rect)
         } else if (!this.isEmptyObject(this.curShape) && this.curShape.isDrawing) {
-          if (this.curShape.type !== 'text') {
-            this.curShape.endX = e.clientX - this.selectRect.x
-            this.curShape.endY = e.clientY - this.selectRect.y
-            this.curShape.draw(this.historyRecord)
-          }
+          this.curShape.endX = e.clientX - this.selectRect.x
+          this.curShape.endY = e.clientY - this.selectRect.y
+          this.curShape.draw(this.historyRecord)
         } else if (this.selectRect.movable) {
           this.toolbar.showToolbar = false
           console.log('move', e)
@@ -516,6 +524,14 @@ export default {
       return Object.assign(Object.create(targetProto), targetObj)
     },
     resetIconSelected() {
+      if (this.iconSelected.text) {
+        const textHelper = document.getElementById('textHelper')
+        if (textHelper && textHelper.innerText.length > 0) {
+          this.curShape.draw(this.historyRecord)
+        } else if (textHelper && textHelper.innerText === '') {
+          textHelper.style.display = 'none'
+        }
+      }
       this.iconSelected = {
         rect: false,
         ellipse: false,
@@ -523,11 +539,6 @@ export default {
         arrow: false,
         mosaic: false,
         text: false
-      }
-      const textHelper = document.getElementById('textHelper')
-      // textHelper.style.display = 'none'
-      if (textHelper.innerText) {
-        this.curShape.draw(this.historyRecord)
       }
     },
     isEmptyObject(obj) {
@@ -606,46 +617,58 @@ export default {
     },
     colorItemClick(event, color) {
       this.clearColorItemSelected()
+      this.showFontSizeOptions = false
       this.isSizeItemDefauleSelected = false
       event.currentTarget.classList.add('color_selected_item')
-      this.setStrokeStyle(color)
+      if (this.curShape.type !== 'text') {
+        this.setStrokeStyle(color)
+      } else {
+        document.getElementById('textHelper').style.color = color
+      }
+    },
+    onFontSizeClick(size) {
+      document.getElementById('textHelper').style.fontSize = size + 'px'
+      this.defaultFontSize = size
+      this.showFontSizeOptions = false
     },
     rectangle() {
-      this.curShape = new Rectangle(this.assCanvas, this.currWin.scaleFactor)
       this.selectRect.movable = false
       this.resetIconSelected()
+      this.curShape = new Rectangle(this.assCanvas, this.currWin.scaleFactor)
       this.iconSelected.rect = true
-      this.setCustomBarRetangeMargin(20)
+      this.setCustomBarRetangeMargin(17.5)
       this.customBar.showCustomBar = true
       this.configToolBarPosition()
       this.showCaptureCustomBar()
     },
     ellipse() {
-      this.curShape = new Ellipse(this.assCanvas, this.currWin.scaleFactor)
       this.selectRect.movable = false
+      // 以下三行有先后顺序
       this.resetIconSelected()
+      this.curShape = new Ellipse(this.assCanvas, this.currWin.scaleFactor)
       this.iconSelected.ellipse = true
-      this.setCustomBarRetangeMargin(60)
+      this.setCustomBarRetangeMargin(60.5)
       this.customBar.showCustomBar = true
       this.configToolBarPosition()
       this.showCaptureCustomBar()
     },
     arrow() {
       this.selectRect.movable = false
-      this.curShape = new Arrow(this.assCanvas, this.currWin.scaleFactor)
       this.resetIconSelected()
+      this.curShape = new Arrow(this.assCanvas, this.currWin.scaleFactor)
       this.iconSelected.arrow = true
-      this.setCustomBarRetangeMargin(100)
+      this.setCustomBarRetangeMargin(103.5)
       this.customBar.showCustomBar = true
       this.configToolBarPosition()
       this.showCaptureCustomBar()
     },
     curve() {
       this.selectRect.movable = false
-      this.curShape = new Curve(this.assCanvas, this.selectRect, this.currWin.scaleFactor)
       this.resetIconSelected()
+      this.curShape = new Curve(this.assCanvas, this.selectRect, this.currWin.scaleFactor)
+      this.recordEvents()
       this.iconSelected.curve = true
-      this.setCustomBarRetangeMargin(140)
+      this.setCustomBarRetangeMargin(146.5)
       this.customBar.showCustomBar = true
       this.configToolBarPosition()
       this.showCaptureCustomBar()
@@ -654,13 +677,13 @@ export default {
       this.selectRect.movable = false
       this.customBar.showCustomBar = true
       this.resetIconSelected()
-      this.iconSelected.mosaic = true
       this.curShape = new Mosaic(this.canvas, this.selectRect, this.currWin.scaleFactor)
+      this.iconSelected.mosaic = true
       if (!this.isMosaicMode) {
         this.makeMosicCanvas()
         this.isMosaicMode = true
       }
-      this.setCustomBarRetangeMargin(45)
+      this.setCustomBarRetangeMargin(50.5)
       this.configToolBarPosition()
       this.showCaptureCustomBar()
     },
@@ -669,7 +692,7 @@ export default {
       this.curShape = new Text(this.selectRect)
       this.resetIconSelected()
       this.iconSelected.text = true
-      this.setCustomBarRetangeMargin(220)
+      this.setCustomBarRetangeMargin(232.5)
       this.customBar.showCustomBar = true
       this.configToolBarPosition()
       this.showCaptureCustomBar()
@@ -716,14 +739,18 @@ export default {
         const lastRecord = this.historyRecord[this.historyRecord.length - 1] // 待撤销的data
         if (lastRecord.type === 'mosaic') {
           this.ctx.putImageData(this.historyRecord[this.historyRecord.length - 1].data, 0, 0)
-        }  else if (lastRecord.type === 'text') {
-          const textNodes = document.getElementsByClassName('textNode')
+        } else if (lastRecord.type === 'text') {
+          const textNodes = document.querySelectorAll('.textNode')
           const lastNode = textNodes[textNodes.length - 1]
-          document.getElementById('capture').removeChild(lastNode)
+          document.getElementById('textContainer').removeChild(lastNode)
         } else if (lastRecord.type === 'textmove') {
           const data = lastRecord.data
           data.node.style.left = data.left + 'px'
           data.node.style.top = data.top + 'px'
+        } else if (lastRecord.type === 'textHelper') {
+          const textHelper = document.getElementById('textHelper')
+          textHelper.style.display = 'none'
+          textHelper.innerText = ''
         } else {
           this.assCtx.putImageData(this.historyRecord[this.historyRecord.length - 1].data, 0, 0)
         }
@@ -734,13 +761,17 @@ export default {
         if (lastRecord.type === 'mosaic') {
           this.ctx.putImageData(lastRecord.data, 0, 0)
         } else if (lastRecord.type === 'text') {
-          const textNodes = document.getElementsByClassName('textNode')
+          const textNodes = document.querySelectorAll('.textNode')
           const lastNode = textNodes[textNodes.length - 1]
-          document.getElementById('capture').removeChild(lastNode)
+          document.getElementById('textContainer').removeChild(lastNode)
         } else if (lastRecord.type === 'textmove') {
           const data = lastRecord.data
           data.node.style.left = data.left + 'px'
           data.node.style.top = data.top + 'px'
+        } else if (lastRecord.type === 'textHelper') {
+          const textHelper = document.getElementById('textHelper')
+          textHelper.style.display = 'none'
+          textHelper.innerText = ''
         } else {
           this.assCtx.clearRect(0, 0, this.assCanvas.width, this.assCanvas.height)
         }
@@ -765,6 +796,7 @@ export default {
       }
     },
     onSaveItemClick() {
+      this.resetIconSelected()
       const dialog = remote.dialog
       this.win.capturePage(
         {
@@ -801,7 +833,7 @@ export default {
       )
     },
     onCheckItemClick() {
-      console.log('onCheckItemClick', this.selectRect)
+      this.resetIconSelected()
       this.win.capturePage(
         {
           x: this.selectRect.x + this.currWin.scaleFactor,
@@ -840,7 +872,7 @@ export default {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
-        overflow: hidden;
+        /*overflow: hidden;*/
     }
 
     .mask {
@@ -877,6 +909,8 @@ export default {
         align-items: center;
         justify-content: center;
         z-index: 4;
+        -webkit-user-select: none;
+        user-select: none;
     }
     .capture_toolbar_item {
         width: 28px;
@@ -965,5 +999,59 @@ export default {
         border-right: 5px solid transparent;
         border-bottom: 5px solid #2a2a2a;
         margin-left: 20px;
+    }
+    .select {
+        width: 52px;
+        height: 20px;
+        background: #393939;
+        border-radius: 1px;
+        position: relative;
+        margin-left: 10px;
+        margin-right: 10px;
+    }
+    .font {
+        position: absolute;
+        display: inline-block;
+        font-family: PingFangSC-Regular;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding-right: 10px;
+        font-size: 12px;
+        color: #ffffff;
+    }
+    .select_triangle {
+        position: absolute;
+        display: inline-block;
+        width: 0;
+        height: 0;
+        margin-right: 4px;
+        border-top: 5px solid white;
+        border-left: 5px solid transparent;
+        border-bottom: 5px solid transparent;
+        border-right: 5px solid transparent;
+        right: 0;
+        top: 8px;
+    }
+    .select_options {
+        width: 52px;
+        position: relative;
+        top: -5px;
+        background: #393939;
+        margin-left: 10px;
+        margin-right: 10px;
+        border-radius: 4px;
+        box-shadow: 10px 5px 5px rgba(0, 0, 1, 0.1);
+    }
+    .select_size_item {
+        font-family: PingFangSC-Regular;
+        font-size: 12px;
+        color: #ffffff;
+        text-align: center;
+        padding: 10px;
+    }
+    .select_size_item:hover {
+        color: #57d493;
+        cursor: pointer;
     }
 </style>
