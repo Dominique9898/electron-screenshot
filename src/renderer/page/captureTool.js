@@ -136,6 +136,7 @@ export class Mosaic extends Shape{
     mainCtx.fill()
   }
 }
+// 文字
 export class Text extends Shape{
   constructor(selectRect) {
     super()
@@ -235,6 +236,15 @@ export class Text extends Shape{
         document.onmouseup = null
       }
     }
+    textNode.ondblclick = (e) => {
+      const textHelper = document.getElementById('textHelper')
+      textHelper.style.left = textNode.style.left
+      textHelper.style.top = textNode.style.top
+      textHelper.style.display = 'block'
+      textHelper.style.cursor = 'text'
+      textHelper.innerText = textNode.innerText
+      document.getElementById('textContainer').removeChild(textNode)
+    }
   }
   draw(historyRecord) {
     const textHelper = document.getElementById('textHelper')
@@ -256,6 +266,7 @@ export class Text extends Shape{
     }
   }
 }
+// 箭头
 export class Arrow extends Shape {
   constructor(asscanvas, scaleFactor) {
     super()
@@ -378,6 +389,7 @@ export class Arrow extends Shape {
     this.Plot.drawArrow(ctx)
   }
 }
+// 画笔
 export class Curve extends Shape {
   constructor(asscanvas, selectRect, scaleFactor) {
     super();
