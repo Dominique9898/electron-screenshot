@@ -26,10 +26,7 @@
                 v-if="!this.selectRect.disable"
                 :style="{
         position: 'absolute',
-        width: this.selectRect.width + 'px',
-        height: this.selectRect.height + 'px',
         zIndex: 3,
-        cursor: !this.selectRect.movable ? 'default' : 'move'
       }"
         ></canvas>
         <div
@@ -221,6 +218,11 @@ export default {
         mosaic: false,
         text: false
       },
+      resizeAnchors: {
+        isResizing: false,
+        selectAnchor: {},
+        selectIndex:0
+      },
       icon: {
         arrow: 'static/image/capture/ico_arrow@2x.png',
         arrowSelected: 'static/image/capture/ico_arrow_selected@2x.png',
@@ -257,6 +259,7 @@ export default {
         endX: 0,
         endY: 0
       },
+      radius: 3,
       mosaicPicBase64: '',
       isMosaicMode: false,
       historyRecord: [], // 保存涂鸦的记录
@@ -318,7 +321,7 @@ export default {
         this.currWin.height = h
         this.currWin.scaleFactor = scaleFactor
         this.currWin.bgPath = 'file://' + require('os').homedir() + `/screen_shot/` + screenshotName + '.png'
-
+        this.radius = this.radius * scaleFactor
         console.log(this.currWin)
         this.initCanvas()
         // 2. 鼠标事件监听
@@ -438,12 +441,41 @@ export default {
           this.curShape.draw(this.historyRecord)
         } else if (this.selectRect.movable) {
           this.toolbar.showToolbar = false
-          console.log('move', e)
-          const rect = {
-            sx: this.selectRect.x + (e.clientX - this.moveConfig.startX),
-            sy: this.selectRect.y + (e.clientY - this.moveConfig.startY),
+          // resize选框
+          const selectAnchor = this.resizeAnchors.selectAnchor
+          let rect = {
+            sx: this.selectRect.x,
+            sy: this.selectRect.y,
             width: this.selectRect.width,
             height: this.selectRect.height
+          }
+          if (selectAnchor && Object.keys(selectAnchor).length) {
+            const {row, col} = this.resizeAnchors.selectAnchor
+            this.resizeAnchors.isResizing = true
+            console.log(row, col)
+            if (row) {
+              if (row === 'lx') {
+                rect.sx = this.selectRect.x + (e.clientX - this.moveConfig.startX)
+                rect.width = this.selectRect.width - (e.clientX - this.moveConfig.startX)
+              } else {
+                rect.width = this.selectRect.width + (e.clientX - this.moveConfig.startX)
+              }
+            }
+            if (col) {
+              if (col === 'ty') {
+                rect.sy = this.selectRect.y + (e.clientY - this.moveConfig.startY)
+                rect.height = this.selectRect.height - (e.clientY - this.moveConfig.startY)
+              } else {
+                rect.height = this.selectRect.height + (e.clientY - this.moveConfig.startY)
+              }
+            }
+          } else {
+            rect = {
+              sx: this.selectRect.x + (e.clientX - this.moveConfig.startX),
+              sy: this.selectRect.y + (e.clientY - this.moveConfig.startY),
+              width: this.selectRect.width,
+              height: this.selectRect.height
+            }
           }
           rect.sx =
             rect.sx <= 0 || rect.sx + rect.width >= this.currWin.width
@@ -459,11 +491,90 @@ export default {
               : rect.sy
           this.drawSelect(rect)
           this.$nextTick(() => {
-            this.assCanvas.style.left = rect.sx + 'px'
-            this.assCanvas.style.top = rect.sy + 'px'
+            this.assCanvas.width = rect.width * this.currWin.scaleFactor + 2 * this.radius
+            this.assCanvas.height = rect.height * this.currWin.scaleFactor + 2 * this.radius
+            this.assCanvas.style.left = rect.sx - this.radius + 'px'
+            this.assCanvas.style.top = rect.sy - this.radius + 'px'
+            this.assCanvas.style.width =  rect.width + 2 * this.radius + 'px'
+            this.assCanvas.style.height = rect.height + 2 * this.radius + 'px'
+            this.assCanvas.style.cursor = 'move'
+            this.drawCircles(rect.width, rect.height)
           })
         }
+      } else {
+        if (!this.selectRect.disable) {
+          let [x, y, r, w, h, scaleFactor] = [e.clientX, e.clientY, this.radius, this.selectRect.width, this.selectRect.height, this.currWin.scaleFactor]
+          let circles = [
+            [r, r],
+            [w / 2 + r, r],
+            [w + r, r],
+
+            [r, h / 2 + r],
+            [w + r, h / 2 + r],
+
+            [r, h + r],
+            [w / 2 + r, h + r],
+            [w + r, h + r],
+          ]
+          circles = circles.map(([x, y]) => {
+            x += this.selectRect.x
+            y += this.selectRect.y
+            return [x, y]
+          })
+          const ANCHORS = [
+            { row: 'lx', col: 'ty', cursor: 'nwse-resize' },
+            { row: '', col: 'ty', cursor: 'ns-resize' },
+            { row: 'rx', col: 'ty', cursor: 'nesw-resize' },
+
+            { row: 'lx', col: '', cursor: 'ew-resize' },
+            { row: 'rx', col: '', cursor: 'ew-resize' },
+
+            { row: 'lx', col: 'by', cursor: 'nesw-resize' },
+            { row: '', col: 'by', cursor: 'ns-resize' },
+            { row: 'rx', col: 'by', cursor: 'nwse-resize' },
+          ]
+          this.resizeAnchors= {
+            selectAnchor: {},
+            selectIndex: 0
+          }
+          circles.forEach((circle, index) => {
+            if (Math.abs(x - circle[0]) <= 10 * scaleFactor && Math.abs(y - circle[1]) <= 10 * scaleFactor) {
+              this.resizeAnchors.selectAnchor = ANCHORS[index]
+              this.resizeAnchors.selectIndex = index
+            }
+          })
+          if (this.resizeAnchors.selectAnchor && Object.keys(this.resizeAnchors.selectAnchor).length) {
+            document.body.style.cursor = this.resizeAnchors.selectAnchor.cursor
+            this.assCanvas.style.cursor = this.resizeAnchors.selectAnchor.cursor
+          } else {
+            document.body.style.cursor = 'default'
+            this.assCanvas.style.cursor = 'move'
+          }
+        }
       }
+    },
+    drawCircles(w, h) {
+      let [r, scaleFactor] = [this.radius, this.currWin.scaleFactor]
+      let circles = [
+        [r, r],
+        [w * scaleFactor / 2 + r, r],
+        [w * scaleFactor + r, r],
+
+        [r, h * scaleFactor / 2 + r],
+        [w * scaleFactor + r, h * scaleFactor / 2 + r],
+
+        [r, h * scaleFactor + r],
+        [w * scaleFactor / 2 + r, h * scaleFactor + r],
+        [w * scaleFactor + r, h * scaleFactor + r],
+      ]
+      circles.forEach((circle) => {
+        this.assCtx.fillStyle = 'white'
+        this.assCtx.strokeStyle = 'black'
+        this.assCtx.beginPath()
+        this.assCtx.arc(circle[0], circle[1], this.radius, 0, Math.PI * 2)
+        this.assCtx.fill()
+        this.assCtx.stroke()
+      })
     },
     onMouseUp(e) {
       if (this.mouseStatus.down) {
@@ -481,10 +592,14 @@ export default {
           this.$nextTick(() => {
             if (that.assCanvas) {
               that.assCanvas.addEventListener('mousedown', this.onMouseDown)
-              that.assCanvas.width = this.selectRect.width * this.currWin.scaleFactor
-              that.assCanvas.height = this.selectRect.height * this.currWin.scaleFactor
-              that.assCanvas.style.left = this.selectRect.x + 'px'
-              that.assCanvas.style.top = this.selectRect.y + 'px'
+              that.assCanvas.width = this.selectRect.width * this.currWin.scaleFactor + 2 * this.radius
+              that.assCanvas.height = this.selectRect.height * this.currWin.scaleFactor + 2 * this.radius
+              that.assCanvas.style.left = this.selectRect.x - this.radius + 'px'
+              that.assCanvas.style.top = this.selectRect.y - this.radius + 'px'
+              that.assCanvas.style.width =  this.selectRect.width + 2 * this.radius + 'px'
+              that.assCanvas.style.height = this.selectRect.height + 2 * this.radius + 'px'
+              that.assCanvas.style.cursor = 'move'
+              that.drawCircles(this.selectRect.width, this.selectRect.height)
             }
           })
         } else if (!this.isEmptyObject(this.curShape) && this.curShape.isDrawing) {
@@ -500,20 +615,42 @@ export default {
             this.canUndo = true
           }
         } else if (this.selectRect.movable) {
-          // 选框Drag
           this.mouseStatus.down = false
           this.mouseStatus.up = true
-          this.selectRect.x += e.clientX - this.moveConfig.startX
-          this.selectRect.y += e.clientY - this.moveConfig.startY
-          if (this.selectRect.x < 0) {
-            this.selectRect.x = 0
-          } else if (this.selectRect.x + this.selectRect.width > this.currWin.width) {
-            this.selectRect.x = this.currWin.width - this.selectRect.width
-          }
-          if (this.selectRect.y < 0) {
-            this.selectRect.y = 0
-          } else if (this.selectRect.y + this.selectRect.height > this.currWin.height) {
-            this.selectRect.y = this.currWin.height - this.selectRect.height
+          // resize
+          if (this.resizeAnchors.isResizing) {
+            this.resizeAnchors.isResizing = false
+            const {row, col} = this.resizeAnchors.selectAnchor
+            if (row) {
+              if (row === 'lx') {
+                this.selectRect.x = this.selectRect.x + (e.clientX - this.moveConfig.startX)
+                this.selectRect.width = this.selectRect.width - (e.clientX - this.moveConfig.startX)
+              } else {
+                this.selectRect.width = this.selectRect.width + (e.clientX - this.moveConfig.startX)
+              }
+            }
+            if (col) {
+              if (col === 'ty') {
+                this.selectRect.y = this.selectRect.y + (e.clientY - this.moveConfig.startY)
+                this.selectRect.height = this.selectRect.height - (e.clientY - this.moveConfig.startY)
+              } else {
+                this.selectRect.height = this.selectRect.height + (e.clientY - this.moveConfig.startY)
+              }
+            }
+          } else {
+            // 选框Drag
+            this.selectRect.x += e.clientX - this.moveConfig.startX
+            this.selectRect.y += e.clientY - this.moveConfig.startY
+            if (this.selectRect.x < 0) {
+              this.selectRect.x = 0
+            } else if (this.selectRect.x + this.selectRect.width > this.currWin.width) {
+              this.selectRect.x = this.currWin.width - this.selectRect.width
+            }
+            if (this.selectRect.y < 0) {
+              this.selectRect.y = 0
+            } else if (this.selectRect.y + this.selectRect.height > this.currWin.height) {
+              this.selectRect.y = this.currWin.height - this.selectRect.height
+            }
           }
           this.configToolBarPosition()
         }
@@ -532,6 +669,8 @@ export default {
           textHelper.style.display = 'none'
         }
       }
+      // 画图模式下不显示圆点
+      this.assCtx.clearRect(0, 0, this.assCanvas.width, this.assCanvas.height)
       this.iconSelected = {
         rect: false,
         ellipse: false,
