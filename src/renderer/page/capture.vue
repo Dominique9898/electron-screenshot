@@ -501,7 +501,7 @@ export default {
           })
         }
       } else {
-        if (!this.selectRect.disable) {
+        if (!this.selectRect.disable && this.isEmptyObject(this.curShape)) {
           let [x, y, r, w, h, scaleFactor] = [e.clientX, e.clientY, this.radius, this.selectRect.width, this.selectRect.height, this.currWin.scaleFactor]
           let circles = [
             [r, r],
@@ -537,7 +537,7 @@ export default {
             selectIndex: 0
           }
           circles.forEach((circle, index) => {
-            if (Math.abs(x - circle[0]) <= 10 * scaleFactor && Math.abs(y - circle[1]) <= 10 * scaleFactor) {
+            if (Math.abs(x - circle[0]) <= 6 && Math.abs(y - circle[1]) <= 6) {
               this.resizeAnchors.selectAnchor = ANCHORS[index]
               this.resizeAnchors.selectIndex = index
             }
@@ -670,6 +670,7 @@ export default {
       }
       // 画图模式下不显示圆点
       this.assCtx.clearRect(0, 0, this.assCanvas.width, this.assCanvas.height)
+      this.assCanvas.style.cursor = 'default'
       this.iconSelected = {
         rect: false,
         ellipse: false,
@@ -692,7 +693,7 @@ export default {
         this.currWin.scaleFactor
       ]
       const margin = this.customBar.showCustomBar ? 50 : 0
-      const capturetoolbarLen = 438
+      const capturetoolbarLen = 447
       // const capturetoolbarLen = 400
       const rightBottomPotin = {
         x: this.selectRect.x + this.selectRect.width,
@@ -702,12 +703,13 @@ export default {
         // 直线
         return
       }
+      // 80工具栏的高, dipx选框的边长, margin 自定义工具栏的高, 工具栏与选框的距离
       rightBottomPotin.y =
         rightBottomPotin.y + 80 + dipx > this.currWin.height
-          ? rightBottomPotin.y - 40 - dipx - margin
-          : rightBottomPotin.y + dipx
+          ? rightBottomPotin.y - 40 - dipx - margin - 6
+          : rightBottomPotin.y + dipx + 6
       if (rightBottomPotin.y <= 0) {
-        rightBottomPotin.y = ry - 40 - dipx - margin
+        rightBottomPotin.y = ry - 40 - dipx - margin - 6
       }
       rightBottomPotin.x = rx - capturetoolbarLen < 0 ? lx : rx - capturetoolbarLen
       this.toolbar.left = rightBottomPotin.x
