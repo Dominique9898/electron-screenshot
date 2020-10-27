@@ -366,7 +366,8 @@ export default {
       }
       this.historyRecord.push({
         type: this.curShape.type,
-        data: currentData
+        data: currentData,
+        shape:this.curShape
       })
     },
     drawSelect(rect) {
@@ -607,8 +608,8 @@ export default {
           this.curShape.endY = e.clientY - this.selectRect.y
           this.mouseStatus.down = false
           this.mouseStatus.up = true
-          const shapeCopy = this.clone(this.curShape)
-          this.shapes.push(shapeCopy)
+          // const shapeCopy = this.clone(this.curShape)
+          // this.shapes.push(shapeCopy)
           this.curShape.reset()
           if (!this.canUndo) {
             this.canUndo = true
@@ -806,7 +807,6 @@ export default {
       this.selectRect.movable = false
       this.resetIconSelected()
       this.curShape = new Curve(this.assCanvas, this.selectRect, this.currWin.scaleFactor)
-      this.recordEvents()
       this.iconSelected.curve = true
       this.setCustomBarRetangeMargin(146.5)
       this.customBar.showCustomBar = true
@@ -874,56 +874,18 @@ export default {
       ipcRenderer.send('SCREENSHOT::CLOSE')
     },
     onUndoItemClick() {
-      console.log(this.historyRecord)
-      if (this.historyRecord.length > 1) {
-        const lastRecord = this.historyRecord[this.historyRecord.length - 1] // 待撤销的data
-        if (lastRecord.type === 'mosaic') {
-          this.ctx.putImageData(this.historyRecord[this.historyRecord.length - 1].data, 0, 0)
-        } else if (lastRecord.type === 'text') {
-          const textNodes = document.querySelectorAll('.textNode')
-          const lastNode = textNodes[textNodes.length - 1]
-          document.getElementById('textContainer').removeChild(lastNode)
-        } else if (lastRecord.type === 'textmove') {
-          const data = lastRecord.data
-          data.node.style.left = data.left + 'px'
-          data.node.style.top = data.top + 'px'
-        } else if (lastRecord.type === 'textHelper') {
-          const textHelper = document.getElementById('textHelper')
-          textHelper.style.display = 'none'
-          textHelper.innerText = ''
-        } else {
-          this.assCtx.putImageData(this.historyRecord[this.historyRecord.length - 1].data, 0, 0)
+      if (this.historyRecord.length) {
+        this.shapes.undo(this.historyRecord)
+        if (this.historyRecord.length === 0) {
+          this.curShape = {}
+          this.mosaicPicBase64 = ''
+          this.ctx.globalCompositeOperation = 'source-over' // 不设置会清空马赛克后拖动无法画图
+          this.isMosaicMode = false
+          this.selectRect.movable = true
+          this.customBar.showCustomBar = false
+          this.canUndo = false
+          this.resetIconSelected()
         }
-        this.historyRecord.pop()
-      } else if (this.historyRecord.length === 1) {
-        // 最后一个记录最开始的状态
-        const lastRecord = this.historyRecord[0]
-        if (lastRecord.type === 'mosaic') {
-          this.ctx.putImageData(lastRecord.data, 0, 0)
-        } else if (lastRecord.type === 'text') {
-          const textNodes = document.querySelectorAll('.textNode')
-          const lastNode = textNodes[textNodes.length - 1]
-          document.getElementById('textContainer').removeChild(lastNode)
-        } else if (lastRecord.type === 'textmove') {
-          const data = lastRecord.data
-          data.node.style.left = data.left + 'px'
-          data.node.style.top = data.top + 'px'
-        } else if (lastRecord.type === 'textHelper') {
-          const textHelper = document.getElementById('textHelper')
-          textHelper.style.display = 'none'
-          textHelper.innerText = ''
-        } else {
-          this.assCtx.clearRect(0, 0, this.assCanvas.width, this.assCanvas.height)
-        }
-        this.historyRecord.pop()
-        this.curShape = {}
-        this.mosaicPicBase64 = ''
-        this.ctx.globalCompositeOperation = 'source-over' // 不设置会清空马赛克后拖动无法画图
-        this.isMosaicMode = false
-        this.selectRect.movable = true
-        this.customBar.showCustomBar = false
-        this.canUndo = false
-        this.resetIconSelected()
       } else {
         this.curShape = {}
         this.mosaicPicBase64 = ''

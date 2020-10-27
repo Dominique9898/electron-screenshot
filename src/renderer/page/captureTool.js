@@ -38,7 +38,6 @@ export class Rectangle extends Shape {
     this.ctx = asscanvas.getContext('2d')
     this.asscanvas = asscanvas
   }
-
   draw(historyRecord) {
     const ctx = this.ctx
     ctx.lineWidth = this.lineWidth * this.scaleFactor
@@ -54,6 +53,13 @@ export class Rectangle extends Shape {
     ctx.rect(this.startX * this.scaleFactor, this.startY * this.scaleFactor, (this.endX - this.startX) * this.scaleFactor, (this.endY - this.startY) * this.scaleFactor)
     ctx.stroke()
   }
+  undo(historyRecord) {
+    if (historyRecord.length === 1) {
+      this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
+    } else {
+      this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    }
+  }
 }
 
 export class Ellipse extends Shape {
@@ -63,6 +69,13 @@ export class Ellipse extends Shape {
     this.scaleFactor = scaleFactor
     this.asscanvas = asscanvas
     this.ctx = asscanvas.getContext('2d')
+  }
+  undo(historyRecord) {
+    if (historyRecord.length === 1) {
+      this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
+    } else {
+      this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    }
   }
   draw(historyRecord) {
     var x = (this.startX + this.endX) / 2
@@ -109,7 +122,7 @@ export class Mosaic extends Shape{
     super()
     this.type = 'mosaic'
     this.scaleFactor = scaleFactor
-    this.maincanvas = mainCanvas
+    this.ctx = mainCanvas.getContext('2d')
     this.selectRect = selectRect
     this.mosaicBlockWidth = this.lineWidth
   }
@@ -129,14 +142,15 @@ export class Mosaic extends Shape{
     ) {
       return
     }
-    const mainCtx = this.maincanvas.getContext('2d')
-    mainCtx.globalCompositeOperation = "destination-out"
-    mainCtx.beginPath();
-    mainCtx.arc(this.endX + this.selectRect.x, this.endY + this.selectRect.y, this.mosaicBlockWidth, 0, Math.PI * 2)
-    mainCtx.fill()
+    this.ctx.globalCompositeOperation = "destination-out"
+    this.ctx.beginPath();
+    this.ctx.arc(this.endX + this.selectRect.x, this.endY + this.selectRect.y, this.mosaicBlockWidth, 0, Math.PI * 2)
+    this.ctx.fill()
+  }
+  undo(historyRecord) {
+    this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
   }
 }
-// 文字
 export class Text extends Shape{
   constructor(selectRect) {
     super()
@@ -203,7 +217,8 @@ export class Text extends Shape{
     textHelper.innerText = ''
 
     historyRecord.push({
-      type: 'text'
+      type: 'text',
+      shape: this
     })
 
     const left = parseInt(textNode.style.left)
@@ -230,7 +245,8 @@ export class Text extends Shape{
             node:textNode,
             left: left,
             top: top
-          }
+          },
+          shape: this
         })
         document.onmousemove = null
         document.onmouseup = null
@@ -246,6 +262,22 @@ export class Text extends Shape{
       document.getElementById('textContainer').removeChild(textNode)
     }
   }
+  undo(historyRecord) {
+    const lastRecord = historyRecord[historyRecord.length - 1] // 待撤销的data
+    if (lastRecord.type === 'text') {
+      const textNodes = document.querySelectorAll('.textNode')
+      const lastNode = textNodes[textNodes.length - 1]
+      document.getElementById('textContainer').removeChild(lastNode)
+    } else if (lastRecord.type === 'textmove') {
+      const data = lastRecord.data
+      data.node.style.left = data.left + 'px'
+      data.node.style.top = data.top + 'px'
+    } else if (lastRecord.type === 'textHelper') {
+      const textHelper = document.getElementById('textHelper')
+      textHelper.style.display = 'none'
+      textHelper.innerText = ''
+    }
+  }
   draw(historyRecord) {
     const textHelper = document.getElementById('textHelper')
     let innerText = textHelper && textHelper.innerText ? textHelper.innerText : ''
@@ -256,9 +288,10 @@ export class Text extends Shape{
       textHelper.style.top = this.startY + 'px'
       textHelper.style.display = 'block'
       if (!historyRecord.length || historyRecord[historyRecord.length - 1].type !== 'textHelper') {
-        // 防止重复点击
+        // 防止重复添加
         historyRecord.push({
-          type:'textHelper'
+          type:'textHelper',
+          shape: this
         })
       }
     } else {
@@ -266,7 +299,6 @@ export class Text extends Shape{
     }
   }
 }
-// 箭头
 export class Arrow extends Shape {
   constructor(asscanvas, scaleFactor) {
     super()
@@ -368,7 +400,12 @@ export class Arrow extends Shape {
 
   draw(historyRecord) {
     const ctx = this.ctx
-    ctx.clearRect(0, 0, this.asscanvas.offsetWidth, this.asscanvas.offsetHeight)
+    ctx.clearRect(
+      0,
+      0,
+      this.asscanvas.offsetWidth * this.scaleFactor,
+      this.asscanvas.offsetHeight * this.scaleFactor
+    )
     if (historyRecord.length > 1) ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
     var beginPoint = {}
     var stopPoint = {}
@@ -388,8 +425,14 @@ export class Arrow extends Shape {
     this.Plot.sideCoord()
     this.Plot.drawArrow(ctx)
   }
+  undo(historyRecord) {
+    if (historyRecord.length === 1) {
+      this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
+    } else {
+      this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    }
+  }
 }
-// 画笔
 export class Curve extends Shape {
   constructor(asscanvas, selectRect, scaleFactor) {
     super();
@@ -436,6 +479,13 @@ export class Curve extends Shape {
     super.reset()
     this.down = false
   }
+  undo(historyRecord) {
+    if (historyRecord.length === 1) {
+      this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
+    } else {
+      this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    }
+  }
 }
 export class Shapes extends Shape {
   constructor() {
@@ -447,10 +497,11 @@ export class Shapes extends Shape {
     this.shapes.push(currentImageData)
   }
 
-  undo() {
-    if (this.canUndo()) {
-      return this.shapes.pop()
-    }
+  undo(historyRecord) {
+    console.log(historyRecord)
+    const curShape = historyRecord[historyRecord.length - 1].shape // 待撤销的data
+    curShape.undo(historyRecord)
+    historyRecord.pop()
   }
 
   canUndo() {
