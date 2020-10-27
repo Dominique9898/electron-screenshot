@@ -1,7 +1,7 @@
 {
   "name": "screenshot",
   "version": "0.0.1",
-  "author": "dominikwei <dominikwei@tencent.com>",
+  "author": "dominikwei <826931133@qq.com>",
   "description": "An electron-vue project",
   "license": null,
   "main": "./dist/electron/main.js",
