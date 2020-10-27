@@ -1,22 +1,3 @@
 # screenshot
 
-> An electron-vue project
-
-#### Build Setup
-
-``` bash
-# install dependencies
-npm install
-
-# serve with hot reload at localhost:9080
-npm run dev
-
-# build electron application for production
-npm run build
-
-
-```
-
----
-
-This project was generated with [electron-vue](https://github.com/SimulatedGREG/electron-vue) using [vue-cli](https://github.com/vuejs/vue-cli). Documentation about the original structure can be found [here](https://simulatedgreg.gitbooks.io/electron-vue/content/index.html).
+> 一个仿企业微信的electron-vue截图工具,实习期间结合知乎和掘金的截图文章,自己重写一个elecron的canvas截图工具
