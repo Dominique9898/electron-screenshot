@@ -669,7 +669,7 @@ export default {
         }
       }
       // 画图模式下不显示圆点
-      this.assCtx.clearRect(0, 0, this.assCanvas.width, this.assCanvas.height)
+      if (this.historyRecord.length === 0) this.assCtx.clearRect(0, 0, this.assCanvas.width, this.assCanvas.height)
       this.assCanvas.style.cursor = 'default'
       this.iconSelected = {
         rect: false,
