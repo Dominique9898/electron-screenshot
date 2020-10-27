@@ -321,7 +321,6 @@ export default {
         this.currWin.height = h
         this.currWin.scaleFactor = scaleFactor
         this.currWin.bgPath = 'file://' + require('os').homedir() + `/screen_shot/` + screenshotName + '.png'
-        this.radius = this.radius * scaleFactor
         console.log(this.currWin)
         this.initCanvas()
         // 2. 鼠标事件监听
@@ -491,8 +490,8 @@ export default {
               : rect.sy
           this.drawSelect(rect)
           this.$nextTick(() => {
-            this.assCanvas.width = rect.width * this.currWin.scaleFactor + 2 * this.radius
-            this.assCanvas.height = rect.height * this.currWin.scaleFactor + 2 * this.radius
+            this.assCanvas.width = (rect.width + 2 * this.radius) * this.currWin.scaleFactor
+            this.assCanvas.height = (rect.height + 2 * this.radius) * this.currWin.scaleFactor
             this.assCanvas.style.left = rect.sx - this.radius + 'px'
             this.assCanvas.style.top = rect.sy - this.radius + 'px'
             this.assCanvas.style.width =  rect.width + 2 * this.radius + 'px'
@@ -557,21 +556,21 @@ export default {
       let [r, scaleFactor] = [this.radius, this.currWin.scaleFactor]
       let circles = [
         [r, r],
-        [w * scaleFactor / 2 + r, r],
-        [w * scaleFactor + r, r],
+        [w / 2 + r, r],
+        [w + r, r],
 
-        [r, h * scaleFactor / 2 + r],
-        [w * scaleFactor + r, h * scaleFactor / 2 + r],
+        [r, h / 2 + r],
+        [w + r, h / 2 + r],
 
-        [r, h * scaleFactor + r],
-        [w * scaleFactor / 2 + r, h * scaleFactor + r],
-        [w * scaleFactor + r, h * scaleFactor + r],
+        [r, h + r],
+        [w / 2 + r, h + r],
+        [w + r, h + r],
       ]
       circles.forEach((circle) => {
         this.assCtx.fillStyle = 'white'
         this.assCtx.strokeStyle = 'black'
         this.assCtx.beginPath()
-        this.assCtx.arc(circle[0], circle[1], this.radius, 0, Math.PI * 2)
+        this.assCtx.arc(circle[0] * scaleFactor, circle[1] * scaleFactor, r * scaleFactor, 0, Math.PI * 2)
         this.assCtx.fill()
         this.assCtx.stroke()
       })
@@ -592,12 +591,12 @@ export default {
           this.$nextTick(() => {
             if (that.assCanvas) {
               that.assCanvas.addEventListener('mousedown', this.onMouseDown)
-              that.assCanvas.width = this.selectRect.width * this.currWin.scaleFactor + 2 * this.radius
-              that.assCanvas.height = this.selectRect.height * this.currWin.scaleFactor + 2 * this.radius
+              that.assCanvas.width = (this.selectRect.width + 2 * this.radius) * this.currWin.scaleFactor
+              that.assCanvas.height = (this.selectRect.height+ 2 * this.radius) * this.currWin.scaleFactor
               that.assCanvas.style.left = this.selectRect.x - this.radius + 'px'
               that.assCanvas.style.top = this.selectRect.y - this.radius + 'px'
               that.assCanvas.style.width =  this.selectRect.width + 2 * this.radius + 'px'
-              that.assCanvas.style.height = this.selectRect.height + 2 * this.radius + 'px'
+              that.assCanvas.style.height = this.selectRect.height+ 2 * this.radius + 'px'
               that.assCanvas.style.cursor = 'move'
               that.drawCircles(this.selectRect.width, this.selectRect.height)
             }
