@@ -282,7 +282,7 @@ let command = 'screencapture -x '
 ```javascript
       ipcRenderer.on('SCREENSHOT::OPEN_MAC', (e, w, h, scaleFactor, screenshotName) => {
         this.currWin.bgPath = basetool.fileInLocal(
-          require('os').homedir() + `/.wxwork_local/screen_shot/` + screenshotName + '.png'
+          require('os').homedir() + path + screenshotName + '.png'
         )
         this.canvas.style.width = this.currWin.width + 'px'
         this.canvas.style.height = this.currWin.height + 'px'
