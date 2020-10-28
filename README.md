@@ -211,7 +211,7 @@ function createWindow () {
    
 3. Mac原生截图
 
-   ```JavaScript
+```JavaScript
 let command = 'screencapture -x '
    let deletecommand = 'rm -rf '
    // displays 保存 在初始化截图窗口的getAlldisplays返回的窗口信息
@@ -222,9 +222,9 @@ let command = 'screencapture -x '
    })
    // command 最后会是 screencapture -x path(保存图片的地址) 屏幕1ID_时间.PNG 屏幕2ID_时间.PNG ... 有几个屏幕就跟几个图片名字
    // -x 只取消截图声音
-   ```
+```
    
-   ```javascript
+```javascript
     ipcMain.on('SCREENSHOT:START', () => {
        startMacScreenshot() {
        state = fs.existsSync(require('os').homedir() + `/screen_shot`)
@@ -251,9 +251,9 @@ let command = 'screencapture -x '
        })
      },
     })
-   ```
-   
-   最后根据屏幕的ID,让对应的截图进程向对应的截图渲染进程发送需要的屏幕参数, 但这有个风险是无法保证displays的屏幕信息数组顺序与screencapture 截图出来的图片对应,但是目前使用感受上是一致的
+```
+
+最后根据屏幕的ID,让对应的截图进程向对应的截图渲染进程发送需要的屏幕参数, 但这有个风险是无法保证displays的屏幕信息数组顺序与screencapture 截图出来的图片对应,但是目前使用感受上是一致的
 
 ### 4. 展示屏幕图片
 
