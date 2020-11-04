@@ -301,16 +301,15 @@ let command = 'screencapture -x '
 
 ## 涂鸦实现思路
 
-<hr>
 
-### 鼠标事件监听与情景
+### 1. 鼠标事件监听与情景
 
 > 1. onMouseDown, onMouseMove, onMouseUp
 > 2. 三个情景: 1. 选取截图选框. 2. 涂鸦 3. 移动截图选框/Resize截图选框
 
 #### 1. 选取截图选框
 
-画选框的逻辑就是绘制一个矩形,矩形里面绘制图片,然后绘制边框线
+画选框的逻辑就是绘制一个矩形外框,矩形里面绘制图片,然后绘制边框线
 
 ```javascript
     drawSelect(rect) {
@@ -340,52 +339,52 @@ let command = 'screencapture -x '
     }
 ```
 
-mousedown绑定全局,这样可以在mainCanvas上进行拖拽选取选框,当选框完成后mousedown绑定assCanvas, 这样保证涂鸦不会画出选框.选框选取完成后,也需要初始化assCanvas的大小位置与选框的位置一致,和在assCanvas上画resize的点.如果resize画在mainCanvas会被assCanvas覆盖,所以画在assCanvas,而如果画在assCanvas上,超出边界的部分会被隐藏,所以需要将assCanvas多留一点resize点的大小. 
+非特殊情况, mousedown, mousemove, mouseup 绑定在document上,这样可以在mainCanvas上进行
 
-```javascript
-if (that.assCanvas) {
-  that.assCanvas.addEventListener('mousedown', this.onMouseDown)
-  that.assCanvas.width = (this.selectRect.width + 2 * this.radius) * this.currWin.scaleFactor
-  that.assCanvas.height = (this.selectRect.height + 2 * this.radius) * this.currWin.scaleFactor
-  that.assCanvas.style.left = this.selectRect.x - this.radius + 'px'
-  that.assCanvas.style.top = this.selectRect.y - this.radius + 'px'
-  that.assCanvas.style.width = this.selectRect.width + 2 * this.radius + 'px'
-  that.assCanvas.style.height = this.selectRect.height + 2 * this.radius + 'px'
-  that.assCanvas.style.cursor = 'move'
-  that.drawCircles(this.selectRect.width, this.selectRect.height)
-}
-```
+1. 选择选区 2. 调整选区大小 3.移动选区 4. 画图.  
+
+通过`isInArea`判断是否在选区内
+
+当选框完成后初始化assCanvas的大小位置与选框的位置一致,在mainCanvas上通过DrawCircles画resize的点.  
 
 ```javascript
 // 绘制resize点
-    drawCircles(w, h) {
-      const [r, scaleFactor] = [this.radius, this.currWin.scaleFactor]
-      const circles = [
-        [r, r],
-        [w / 2 + r, r],
-        [w + r, r],
+    drawCircles(w, h, x, y) {
+      // 1. 选好选区后画圆点
+      // 2. 移动选框时也要画圆点
+      // 3. 进入画图模式不需要画圆点
+      let circles = [
+        [0, 0],
+        [w / 2, 0],
+        [w, 0],
 
-        [r, h / 2 + r],
-        [w + r, h / 2 + r],
+        [0, h / 2],
+        [w, h / 2],
 
-        [r, h + r],
-        [w / 2 + r, h + r],
-        [w + r, h + r]
+        [0, h],
+        [w / 2, h],
+        [w, h]
       ]
-      this.assCtx.fillStyle = 'white'
-      this.assCtx.strokeStyle = 'black'
-      circles.forEach((circle) => {
-        this.assCtx.beginPath()
-        this.assCtx.arc(circle[0] * scaleFactor, circle[1] * scaleFactor, r * scaleFactor, 0, Math.PI * 2)
-        this.assCtx.fill()
-        this.assCtx.stroke()
+      circles = circles.map(([cx, cy]) => {
+        return [cx + x, cy + y]
       })
-    },
+      this.ctx.fillStyle = 'white'
+      this.ctx.strokeStyle = 'black'
+      this.ctx.lineWidth = 1
+      circles.forEach((circle) => {
+        this.ctx.beginPath()
+        this.ctx.arc(circle[0], circle[1], 3, 0, Math.PI * 2)
+        this.ctx.fill()
+        this.ctx.stroke()
+      })
+    }
 ```
 
 #### 2. 涂鸦的逻辑处理
 
-进入涂鸦模式不能再Resize,因为resize的点都画在assCanvas上所以需要清除assCanvas画布. 为了能实现撤销的功能,所以需要在每次mousedown的时候保存当前的记录, this.recordEvents. 防止画下每一次move时的标记,所以需要先清除画布,然后恢复最近保存的记录,然后再画新图案. 
+进入涂鸦模式不能再Resize, 因为resize的点都画在mainCanvas上所以需要重新在画布画一遍无点的内容. 为了能实现撤销的功能,所以需要在每次mousedown的时候保存当前的记录, this.recordEvents. 
+
+在画矩形,椭圆这类. 为了防止在move的时候画下每一次move时的标记,所以需要先清除画布,然后恢复最近保存的记录,然后再按新坐标画新图案. 
 
 ```javascript
 // down的时候保存记录    
@@ -423,17 +422,15 @@ recordEvents() {
   }
 ```
 
-为了保证马赛克(原理是取像素平均值)不和其他涂鸦冲突,马赛克画在maincanvas层,其他画在assCanvas层
+**为了保证马赛克(原理是取像素平均值)不和其他涂鸦冲突,马赛克画在maincanvas层,其他画在assCanvas层**
 
 #### 3. 移动截图选框/Resize截图选框
 
 移动截图选框的逻辑是根据鼠标拖动来改变drawImage的x和y, width和height不变
 
-Resize: 首先需要监听鼠标的移动, mousemove是全局下, 判断鼠标的位置是否在resize点上,由于resize点在assCanvas的位置是相对固定的, 相对maincanvas的距离只需要加上asscanv的left 和 top值, 如果有保存改点的信息到selectArchor, 并改变鼠标的样式,如果move的时候是在点上就根据selectArchor上row和col的属性控制方向
+Resize: 首先需要监听鼠标的移动, mousemove是全局下, 判断鼠标的位置是否在resize点上, 若在, 设置变量 selectAnchor保存, 当movedown的时候判断selectAnchor是否为空, 为空 进入移动选框模式, 存在进入调整选框大小模式
 
-
-
-### 马赛克
+### 2. 马赛克
 
 受刮刮乐的启发,点击马赛克选项后使用getImageData获取当前canvas的图片,然后创建一个临时canvas将图片马赛克处理然后画在临时canvas然后再将临时canvas.toDataURL转出图片base64地址放在mainCanvas上渲染,通过css来控制背景的位置大小
 
@@ -459,6 +456,7 @@ Resize: 首先需要监听鼠标的移动, mousemove是全局下, 判断鼠标�
     makeMosicCanvas() {
       const asscanvas = document.createElement('canvas')
       const assctx = asscanvas.getContext('2d')
+      // 2 * this.currWin.scaleFactor边框粗细
       asscanvas.width = (this.selectRect.width - 2 * this.currWin.scaleFactor) * this.currWin.scaleFactor
       asscanvas.height = (this.selectRect.height - 2 * this.currWin.scaleFactor) * this.currWin.scaleFactor
       // 获取选框内的图片资源, 画马赛克原图使用
@@ -485,16 +483,27 @@ Resize: 首先需要监听鼠标的移动, mousemove是全局下, 判断鼠标�
         }
       }
       this.mosaicPicBase64 = asscanvas.toDataURL('image/PNG')
-      console.log('originImageData', originImageData)
-      console.log('mosaicPicBase64', this.mosaicPicBase64)
     },
 ```
 
-### 文字
+这样就是maincanvas被分成两部,background层+画布层,现在需要做的就是在鼠标move的时候将画布层的东西刮掉显示底层的东西, 这里在话mosaic的时候将ctx设置成`ctx.globalCompositeOperation = "destination-out"`, 结束mosaic模式下换回'source-over'`
 
-文字部分不同其他部分, 文字通过div操作, 当初次选文字会创建一个大小位置跟选区一样的div.textContainer, 和一个可编辑的div,textHelper. 
+### 3. 文字
 
-div.textContainer用来存放textNode和textHelper.textHelper来跟随鼠标的点击移动,当textHelper输入文字后再点击别处,会创建一个div.textNode来保存textHelper的内容,textHelper隐藏内容情况,通过textContainer,.appendChild加入textNode,位置与textHelper一致.同时绑定鼠标监听来做移动和修改的处理.
+文字部分不同其他部分, 文字通过div操作, 当初次选文字会创建一个大小位置跟选区一样的div.textContainer, 和一个可编辑的div,textHelper.  
+
+div.textContainer用来存放textNode和textHelper.  div.textContainer要使用绝对布局,overflow:hidden, 这样textNode在移动的时候移除边界会被隐藏
+
+textHelper用辅助来跟随鼠标的点击移动,当textHelper输入文字后再点击别处,会创建一个div.textNode来保存textHelper的内容,textHelper隐藏内容清空,通过textContainer,.appendChild加入textNode,位置与textHelper一致.同时绑定鼠标监听来做移动和修改的处理.
+
+撤销有四个情景: 
+
+1. textHelper(无内容清空多次点击鼠标只记录一次) 
+2. textmove(每次移动前记录当下的x,y撤销的时候恢复xy), 
+3. textNode(删除textContainer内的最后一个node节点)
+4. editortext 修改节点内容
+
+在双击修改节点内容时也会触发单击节点的回调函数, 所以为了防止冲突, 设置this.editorText和 move的距离 做判断,在双击节点时候都会产生鼠标的移动而被计入成textmove 所以当移动距离大于1才能被记录, 其次当修改内容不一致的时候才记录editortext.
 
 ```javascript
   createTextNode(shapes) {
@@ -504,38 +513,166 @@ div.textContainer用来存放textNode和textHelper.textHelper来跟随鼠标的�
     textNode.innerText = textHelper.innerText
     textHelper.innerText = ''
     // .... 
-    const left = parseInt(textNode.style.left)
-    const top = parseInt(textNode.style.top)
     document.getElementById('textContainer').appendChild(textNode)
-    let [down, up, move] = [false, false, false]
+    let flag = false
+    let move = false
     textNode.onmousedown = (e) => {
-      down = true
-      up = false
+      // 防止单次点击与双击冲突
+      if (this.editorText) return
       if (textHelper.innerText.length > 0 ) this.createTextNode(shapes)
       textHelper.style.display = 'none'
+
+      const left = parseInt(textNode.style.left)
+      const top = parseInt(textNode.style.top)
+
+      this.startX = e.clientX
+      this.startY = e.clientY
+      flag = true
+
       document.onmousemove = (e) => {
-        if (down && !up) {
+        const moveLength = Math.sqrt(Math.pow(this.startX - e.clientX, 2) + Math.pow(this.startY - e.clientY, 2))
+        console.log(moveLength)
+        if (!this.editorText && moveLength > 1 && flag) {
+          move = true
           textNode.style.left = left + (e.clientX - this.selectRect.x - left)  + 'px'
           textNode.style.top = top + (e.clientY - this.selectRect.y - top) + 'px'
         }
       }
+
+
       document.onmouseup = (e) => {
-        down = false
-        up = true
-        document.onmousemove = null
-        document.onmouseup = null
+        if(flag && move && !this.editorText) {
+          shapes.push({
+            type: 'textmove',
+            data: {
+              node: textNode,
+              left: left,
+              top: top
+            },
+            shape: this
+          })
+          document.onmousemove = null
+          document.onmouseup = null
+        }
+        flag = false
+        move = false
       }
     }
     textNode.ondblclick = (e) => {
-      const textHelper = document.getElementById('textHelper')
-      textHelper.style.left = textNode.style.left
-      textHelper.style.top = textNode.style.top
-      textHelper.style.display = 'block'
-      textHelper.style.cursor = 'text'
-      textHelper.innerText = textNode.innerText
-      document.getElementById('textContainer').removeChild(textNode)
+      this.editorText = true
+      this.node = textNode
+      let innerText = textNode.innerText
+      textNode.setAttribute('contenteditable', true)
+      textNode.style.cursor = 'text'
+      textNode.style.border = '1px solid black'
+      textNode.onblur = () => {
+        this.editorText = false
+        textNode.style.cursor = 'move'
+        textNode.style.border = ''
+        textNode.setAttribute('contenteditable', false)
+        if (textNode.innerText !== innerText) {
+          shapes.push({
+            type:'editortext',
+            data: {
+              node:textNode,
+              Text: innerText
+            },
+            shape: this
+          })
+        }
+      }
     }
   }
 ```
 
+### 4. 撤销
 
+整体的思路是每次draw之前都会记录当前状态. 那么在canvas中,由于是画马赛克,文字,画笔这种不规律的操作时, 只记录下前一次和后一次的x,y 是无法复原的. 因此除开文字的部分其他基于canvas的操作我选择使用, getImageData`和`putImageData`进行保存和撤回
+
+首先有一个Shapes的类
+
+```javascript
+export class Shapes extends Shape {
+  constructor() {
+    super()
+    this.shapes = [] // 用来保存每一次执行的shape对象
+  }
+  push(currentImageData) {
+    this.shapes.push(currentImageData) // 在movedown的时候,非文字调用recordEvents(上文涂鸦逻辑实现)
+  }
+  undo() {
+    const curShape = this.shapes[this.shapes.length - 1].shape // 待撤销的data
+    curShape.undo(this.shapes) // 负责分发执行者执行undo
+    this.shapes.pop()
+  }
+  canUndo() {
+    return this.shapes.length > 0
+  }
+  reset() {
+    this.shapes = []
+  }
+}
+```
+
+每一次movedown时,记录
+
+```JavaScript
+    onMouseDown(e) {
+    	 // .....
+        if (!this.isEmptyObject(this.curShape)) {
+        	// ....
+          this.curShape.start(e.clientX - this.selectRect.x, e.clientY - this.selectRect.y)
+          if (this.curShape.type !== 'text') {
+            this.recordEvents()
+          } else {
+            this.curShape.draw(this.shapes.shapes)
+            // 这里就是画textHelper, 将e.offSetX 和 e.offSetY或者e.clientX - (assCanvas的left值)/e.clientY - (assCanvas的Top值)当做textHelper的left和top,
+          }
+        }
+    }
+```
+
+每一个Rectangle,ellipse... 类都有自己对应的draw函数和undo函数
+
+在mousemove时执行图形对象的draw方法
+
+```JavaScript
+    onMouseMove(e) {
+			if (!this.isEmptyObject(this.curShape) && this.curShape.isDrawing) {
+          this.curShape.endX = e.clientX - this.selectRect.x
+          this.curShape.endY = e.clientY - this.selectRect.y
+          this.curShape.draw(this.shapes.shapes) // 执行图片对象的draw方法
+      }
+    }
+```
+
+当点击撤销时, 调用shape类的canUndo方法,也就是判断this.shapes是否存有绘图对象,主要用三个属性,type,data(如果是画在canvas中的保存的是imageData,如果是text的类型储存是位置信息),shape. 如果存在绘图对象,就把对象弹出,并执行该对象的undo方法
+
+以画笔为例:
+
+```JavaScript
+export class Curve extends Shape {
+  constructor(asscanvas, selectRect, scaleFactor) {
+    super();
+    this.type = 'curve'
+    this.ctx = asscanvas.getContext('2d')
+    this.asscanvas = asscanvas
+    this.selectRect = selectRect
+    this.scaleFactor = scaleFactor
+  }
+  draw() {
+    // ....
+  }
+  reset() {
+    super.reset()
+    this.down = false
+  }
+  undo(shapes) {
+    if (shapes.length === 1) {
+      this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
+    } else {
+      this.ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
+    }
+  }
+}
+```
