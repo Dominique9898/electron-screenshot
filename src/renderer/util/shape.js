@@ -38,7 +38,7 @@ export class Rectangle extends Shape {
     this.ctx = asscanvas.getContext('2d')
     this.asscanvas = asscanvas
   }
-  draw(historyRecord) {
+  draw(shapes) {
     const ctx = this.ctx
     ctx.lineWidth = this.lineWidth * this.scaleFactor
     ctx.strokeStyle = this.strokeStyle
@@ -48,16 +48,16 @@ export class Rectangle extends Shape {
       this.asscanvas.offsetWidth * this.scaleFactor,
       this.asscanvas.offsetHeight * this.scaleFactor
     )
-    if (historyRecord.length > 1) ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    if (shapes.length > 1) ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
     ctx.beginPath()
     ctx.rect(this.startX * this.scaleFactor, this.startY * this.scaleFactor, (this.endX - this.startX) * this.scaleFactor, (this.endY - this.startY) * this.scaleFactor)
     ctx.stroke()
   }
-  undo(historyRecord) {
-    if (historyRecord.length === 1) {
+  undo(shapes) {
+    if (shapes.length === 1) {
       this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
     } else {
-      this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+      this.ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
     }
   }
 }
@@ -70,14 +70,14 @@ export class Ellipse extends Shape {
     this.asscanvas = asscanvas
     this.ctx = asscanvas.getContext('2d')
   }
-  undo(historyRecord) {
-    if (historyRecord.length === 1) {
+  undo(shapes) {
+    if (shapes.length === 1) {
       this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
     } else {
-      this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+      this.ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
     }
   }
-  draw(historyRecord) {
+  draw(shapes) {
     var x = (this.startX + this.endX) / 2
     var y = (this.startY + this.endY) / 2
     var w = this.endX - this.startX
@@ -88,7 +88,7 @@ export class Ellipse extends Shape {
       this.asscanvas.offsetWidth * this.scaleFactor,
       this.asscanvas.offsetHeight * this.scaleFactor
     )
-    if (historyRecord.length > 1) this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    if (shapes.length > 1) this.ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
     this.drawEllipse(
       this.ctx,
       this.startX * this.scaleFactor,
@@ -127,6 +127,14 @@ export class Mosaic extends Shape{
     this.mosaicBlockWidth = this.lineWidth
   }
   draw() {
+    if (this.endX + this.mosaicBlockWidth >= this.selectRect.width  - this.scaleFactor ||
+      this.endY + this.mosaicBlockWidth >= this.selectRect.height  - this.scaleFactor ||
+      this.endX - this.mosaicBlockWidth <= this.scaleFactor ||
+      this.endY - this.mosaicBlockWidth <= this.scaleFactor
+    ) {
+      return
+    }
+
     // 圆心 (this.endX, this.endY), 半径 R = this.mosaicBlockWidth
     if (this.lineWidth === 7) {
       this.mosaicBlockWidth = 15
@@ -135,27 +143,23 @@ export class Mosaic extends Shape{
     } else {
       this.mosaicBlockWidth = 5
     }
-    if (this.endX + this.mosaicBlockWidth >= this.selectRect.width  - this.scaleFactor ||
-      this.endY + this.mosaicBlockWidth >= this.selectRect.height  - this.scaleFactor ||
-      this.endX - this.mosaicBlockWidth <= this.scaleFactor ||
-      this.endY - this.mosaicBlockWidth <= this.scaleFactor
-    ) {
-      return
-    }
+
     this.ctx.globalCompositeOperation = "destination-out"
     this.ctx.beginPath();
     this.ctx.arc(this.endX + this.selectRect.x, this.endY + this.selectRect.y, this.mosaicBlockWidth, 0, Math.PI * 2)
     this.ctx.fill()
   }
-  undo(historyRecord) {
-    this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+  undo(shapes) {
+    this.ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
   }
 }
 export class Text extends Shape{
   constructor(selectRect) {
     super()
     this.fontSize = 22
+    this.node = null
     this.selectRect = selectRect
+    this.editorText = false
     this.type = 'text'
     this.textHelperStyle = {
       position: 'absolute',
@@ -200,8 +204,58 @@ export class Text extends Shape{
       textContainer.style.cssText = `position: absolute;overflow:hidden;left: ${this.selectRect.x}px; top:${this.selectRect.y}px; width:${this.selectRect.width}px; height:${this.selectRect.height}px`
     }
   }
-  createTextNode(historyRecord) {
-    historyRecord.pop() // pop出textHelper
+  draw(shapes) {
+    if (this.editorText) {
+      if (this.node.style.border) {
+        // 双击节点后未被选中后blur
+        this.editorText = false
+        this.node.style.cursor = 'move'
+        this.node.style.border = ''
+        this.node.setAttribute('contenteditable', false)
+      }
+      return
+    }
+    const textHelper = document.getElementById('textHelper')
+    let innerText = textHelper && textHelper.innerText ? textHelper.innerText : ''
+    console.log('draw text', innerText)
+    if (innerText.length === 0) {
+      // x, y 是针对asscanvas 的offsetX, offsetY
+      textHelper.style.left = this.startX + 'px'
+      textHelper.style.top = this.startY + 'px'
+      textHelper.style.display = 'block'
+      if (!shapes.length || shapes[shapes.length - 1].type !== 'textHelper') {
+        // 防止重复添加
+        shapes.push({
+          type:'textHelper',
+          shape: this
+        })
+      }
+    } else {
+      this.createTextNode(shapes)
+    }
+  }
+  undo(shapes) {
+    const lastRecord = shapes[shapes.length - 1] // 待撤销的data
+    if (lastRecord.type === 'text') {
+      const textNodes = document.querySelectorAll('.textNode')
+      const lastNode = textNodes[textNodes.length - 1]
+      document.getElementById('textContainer').removeChild(lastNode)
+    } else if (lastRecord.type === 'textmove') {
+      const data = lastRecord.data
+      data.node.style.left = data.left + 'px'
+      data.node.style.top = data.top + 'px'
+    } else if (lastRecord.type === 'textHelper') {
+      const textHelper = document.getElementById('textHelper')
+      textHelper.style.display = 'none'
+      textHelper.innerText = ''
+    } else if (lastRecord.type === 'editortext') {
+      console.log(lastRecord.data.node)
+      console.log(lastRecord.data.innerText)
+      lastRecord.data.node.innerText = lastRecord.data.Text
+    }
+  }
+  createTextNode(shapes) {
+    shapes.pop() // pop出textHelper
     const textHelper = document.getElementById('textHelper')
     let style = ''
     style = textHelper.style.cssText
@@ -216,86 +270,79 @@ export class Text extends Shape{
     textNode.innerText = textHelper.innerText
     textHelper.innerText = ''
 
-    historyRecord.push({
+    shapes.push({
       type: 'text',
       shape: this
     })
 
-    const left = parseInt(textNode.style.left)
-    const top = parseInt(textNode.style.top)
     document.getElementById('textContainer').appendChild(textNode)
-    let [down, up, move] = [false, false, false]
+    let flag = false
+    let move = false
     textNode.onmousedown = (e) => {
-      down = true
-      up = false
-      if (textHelper.innerText.length > 0 ) this.createTextNode(historyRecord)
+      // 防止单次点击与双击冲突
+      if (this.editorText) return
+      if (textHelper.innerText.length > 0 ) this.createTextNode(shapes)
       textHelper.style.display = 'none'
+
+      const left = parseInt(textNode.style.left)
+      const top = parseInt(textNode.style.top)
+
+      this.startX = e.clientX
+      this.startY = e.clientY
+      flag = true
+
       document.onmousemove = (e) => {
-        if (down && !up) {
+        const moveLength = Math.sqrt(Math.pow(this.startX - e.clientX, 2) + Math.pow(this.startY - e.clientY, 2))
+        console.log(moveLength)
+        if (!this.editorText && moveLength > 1 && flag) {
+          move = true
           textNode.style.left = left + (e.clientX - this.selectRect.x - left)  + 'px'
           textNode.style.top = top + (e.clientY - this.selectRect.y - top) + 'px'
         }
       }
+
+
       document.onmouseup = (e) => {
-        down = false
-        up = true
-        historyRecord.push({
-          type:'textmove',
-          data: {
-            node:textNode,
-            left: left,
-            top: top
-          },
-          shape: this
-        })
-        document.onmousemove = null
-        document.onmouseup = null
+        if(flag && move && !this.editorText) {
+          shapes.push({
+            type: 'textmove',
+            data: {
+              node: textNode,
+              left: left,
+              top: top
+            },
+            shape: this
+          })
+          document.onmousemove = null
+          document.onmouseup = null
+        }
+        flag = false
+        move = false
       }
     }
     textNode.ondblclick = (e) => {
-      const textHelper = document.getElementById('textHelper')
-      textHelper.style.left = textNode.style.left
-      textHelper.style.top = textNode.style.top
-      textHelper.style.display = 'block'
-      textHelper.style.cursor = 'text'
-      textHelper.innerText = textNode.innerText
-      document.getElementById('textContainer').removeChild(textNode)
-    }
-  }
-  undo(historyRecord) {
-    const lastRecord = historyRecord[historyRecord.length - 1] // 待撤销的data
-    if (lastRecord.type === 'text') {
-      const textNodes = document.querySelectorAll('.textNode')
-      const lastNode = textNodes[textNodes.length - 1]
-      document.getElementById('textContainer').removeChild(lastNode)
-    } else if (lastRecord.type === 'textmove') {
-      const data = lastRecord.data
-      data.node.style.left = data.left + 'px'
-      data.node.style.top = data.top + 'px'
-    } else if (lastRecord.type === 'textHelper') {
-      const textHelper = document.getElementById('textHelper')
-      textHelper.style.display = 'none'
-      textHelper.innerText = ''
-    }
-  }
-  draw(historyRecord) {
-    const textHelper = document.getElementById('textHelper')
-    let innerText = textHelper && textHelper.innerText ? textHelper.innerText : ''
-    console.log('draw text', innerText)
-    if (innerText.length === 0) {
-      // x, y 是针对asscanvas 的offsetX, offsetY
-      textHelper.style.left = this.startX + 'px'
-      textHelper.style.top = this.startY + 'px'
-      textHelper.style.display = 'block'
-      if (!historyRecord.length || historyRecord[historyRecord.length - 1].type !== 'textHelper') {
-        // 防止重复添加
-        historyRecord.push({
-          type:'textHelper',
-          shape: this
-        })
+      this.editorText = true
+      this.node = textNode
+      let innerText = textNode.innerText
+      textNode.setAttribute('contenteditable', true)
+      textNode.style.cursor = 'text'
+      textNode.style.border = '1px solid black'
+      textNode.onblur = () => {
+        this.editorText = false
+        textNode.style.cursor = 'move'
+        textNode.style.border = ''
+        textNode.setAttribute('contenteditable', false)
+        if (textNode.innerText !== innerText) {
+          shapes.push({
+            type:'editortext',
+            data: {
+              node:textNode,
+              Text: innerText
+            },
+            shape: this
+          })
+        }
       }
-    } else {
-      this.createTextNode(historyRecord)
     }
   }
 }
@@ -398,7 +445,7 @@ export class Arrow extends Shape {
     }
   }
 
-  draw(historyRecord) {
+  draw(shapes) {
     const ctx = this.ctx
     ctx.clearRect(
       0,
@@ -406,7 +453,7 @@ export class Arrow extends Shape {
       this.asscanvas.offsetWidth * this.scaleFactor,
       this.asscanvas.offsetHeight * this.scaleFactor
     )
-    if (historyRecord.length > 1) ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+    if (shapes.length > 1) ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
     var beginPoint = {}
     var stopPoint = {}
     beginPoint.x = this.startX * this.scaleFactor
@@ -425,11 +472,11 @@ export class Arrow extends Shape {
     this.Plot.sideCoord()
     this.Plot.drawArrow(ctx)
   }
-  undo(historyRecord) {
-    if (historyRecord.length === 1) {
+  undo(shapes) {
+    if (shapes.length === 1) {
       this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
     } else {
-      this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+      this.ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
     }
   }
 }
@@ -479,11 +526,11 @@ export class Curve extends Shape {
     super.reset()
     this.down = false
   }
-  undo(historyRecord) {
-    if (historyRecord.length === 1) {
+  undo(shapes) {
+    if (shapes.length === 1) {
       this.ctx.clearRect(0, 0, this.asscanvas.width, this.asscanvas.height)
     } else {
-      this.ctx.putImageData(historyRecord[historyRecord.length - 1].data, 0, 0)
+      this.ctx.putImageData(shapes[shapes.length - 1].data, 0, 0)
     }
   }
 }
@@ -497,11 +544,10 @@ export class Shapes extends Shape {
     this.shapes.push(currentImageData)
   }
 
-  undo(historyRecord) {
-    console.log(historyRecord)
-    const curShape = historyRecord[historyRecord.length - 1].shape // 待撤销的data
-    curShape.undo(historyRecord)
-    historyRecord.pop()
+  undo() {
+    const curShape = this.shapes[this.shapes.length - 1].shape // 待撤销的data
+    curShape.undo(this.shapes)
+    this.shapes.pop()
   }
 
   canUndo() {

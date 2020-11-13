@@ -4,7 +4,7 @@
   "author": "dominikwei <826931133@qq.com>",
   "description": "An electron-vue project",
   "license": null,
-  "main": "./dist/electron/main.js",
+  "main": "./dist/main/main.js",
   "scripts": {
     "build": "node .electron-vue/build.js && electron-builder",
     "build:dir": "node .electron-vue/build.js && electron-builder --dir",
@@ -23,7 +23,7 @@
       "output": "build"
     },
     "files": [
-      "dist/electron/**/*"
+      "dist/**/*"
     ],
     "dmg": {
       "contents": [

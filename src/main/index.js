@@ -1,5 +1,5 @@
 import { app, BrowserWindow, globalShortcut } from 'electron'
-import screenMaintool  from '../main/screenshot/screenMain'
+import CaptureView from "./captureview";
 /**
  * Set `__static` path to static files in production
  * https://simulatedgreg.gitbooks.io/electron-vue/content/en/using-static-assets.html
@@ -34,7 +34,9 @@ function createWindow () {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
-  screenMaintool.useCapture()
+  const capture = new CaptureView({
+    multiScreen: false
+  })
 }
 
 app.on('ready', createWindow)
