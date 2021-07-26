@@ -4,9 +4,9 @@
 
 ### 首先效果图:
 
-<img src="/pic/image-20201028150949290.png" alt="image-20201028150949290" style="zoom:25%;" />
+<img src="./pic/image-20201028150949290.png" alt="image-20201028150949290" style="zoom:25%;" />
 
-<img src="/pic/image-20201028150823803.png" alt="image-20201028150823803" style="zoom:25%;" />
+<img src="./pic/image-20201028150823803.png" alt="image-20201028150823803" style="zoom:25%;" />
 
 ## 实现功能
 
